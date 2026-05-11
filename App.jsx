@@ -473,7 +473,7 @@ export default function App() {
     <div style={{ display:"flex", minHeight:"100vh", background:"#0d1117", fontFamily:"'DM Sans','Segoe UI',sans-serif", color:"#e2e8f0" }}>
       <div style={{ width:200, background:"#111827", borderRight:"1px solid #1e2a3a", padding:"24px 0", display:"flex", flexDirection:"column", flexShrink:0 }}>
         <div style={{ padding:"0 20px 24px", borderBottom:"1px solid #1e2a3a" }}>
-          <div style={{ fontSize:16, fontWeight:700, color:"#e2e8f0" }}>✂️ Salón Pro</div>
+          <div style={{ fontSize:16, fontWeight:700, color:"#e2e8f0" }}>✂️ Bertuchi</div>
           <div style={{ fontSize:11, color:"#10b981", marginTop:4, display:"flex", alignItems:"center", gap:6 }}>
             <span style={{ width:6, height:6, borderRadius:"50%", background:"#10b981", display:"inline-block" }} />
             Conectado a Supabase
