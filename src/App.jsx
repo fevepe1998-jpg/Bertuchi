@@ -167,7 +167,7 @@ function Estilistas({ estilistas, loading, onAdd, onDelete, onUpdate }) {
 }
 
 // ── ATENCIONES ────────────────────────────────────────────────────────────────
-function Atenciones({ atenciones, loading, onAdd, estilistas }) {
+function Atenciones({ atenciones, loading, onAdd, onDelete, estilistas }) {
   const hoy = hoyStr();
   const empty = { fecha:hoy, cliente:"", estilistaId:"", servicios:[], otroServicio:"", subtotal:"", descuento:"0", metodoPago:"Efectivo", nota:"" };
   const [form, setForm] = useState(empty);
@@ -222,7 +222,10 @@ function Atenciones({ atenciones, loading, onAdd, estilistas }) {
     const a = detalle;
     return (
       <div style={{ maxWidth:480 }}>
-        <button onClick={()=>setDetalle(null)} style={{ background:"transparent", border:"1px solid #2a3042", borderRadius:8, color:"#8892a4", padding:"6px 14px", cursor:"pointer", fontSize:13, marginBottom:20 }}>← Volver</button>
+        <div style={{ display:"flex", gap:10, marginBottom:20 }}>
+          <button onClick={()=>setDetalle(null)} style={{ background:"transparent", border:"1px solid #2a3042", borderRadius:8, color:"#8892a4", padding:"6px 14px", cursor:"pointer", fontSize:13 }}>← Volver</button>
+          <button onClick={()=>{ if(window.confirm("¿Eliminar esta atención? No se puede deshacer.")){ onDelete(a.id); setDetalle(null); } }} style={{ background:"transparent", border:"1px solid #e8614e44", borderRadius:8, color:"#e8614e", padding:"6px 14px", cursor:"pointer", fontSize:13 }}>🗑 Eliminar</button>
+        </div>
         <div style={{ background:"#1a1f2e", border:"1px solid #2a3042", borderRadius:16, padding:28, display:"flex", flexDirection:"column", gap:16 }}>
           <div style={{ display:"flex", justifyContent:"space-between", borderBottom:"1px solid #2a3042", paddingBottom:16 }}>
             <div>
@@ -401,6 +404,7 @@ function Atenciones({ atenciones, loading, onAdd, estilistas }) {
                     {a.estilista && (a.porcentaje_estilista||0)>0 && <div style={{ fontSize:11, color:"#8892a4" }}>Salón: <span style={{ color:"#10b981" }}>{fmt(a.ganancia_salon)}</span></div>}
                     <div style={{ fontSize:11, color:"#8892a4" }}>{a.metodo_pago}</div>
                     <div style={{ fontSize:11, color:"#5b8dee", marginTop:4 }}>Ver remisión →</div>
+                    <button onClick={e=>{ e.stopPropagation(); if(window.confirm("¿Eliminar esta atención?")){ onDelete(a.id); } }} style={{ marginTop:4, fontSize:11, padding:"3px 8px", borderRadius:6, border:"1px solid #e8614e44", background:"transparent", color:"#e8614e", cursor:"pointer" }}>🗑 Eliminar</button>
                   </div>
                 </div>
               </div>
@@ -1053,6 +1057,7 @@ export default function App() {
   const deleteEstilista = async (id) => { await db.from("estilistas").delete().eq("id",id); setEstilistas(p=>p.filter(e=>e.id!==id)); };
   const updateEstilista = async (upd) => { await db.from("estilistas").update({nombre:upd.nombre,telefono:upd.telefono||null,especialidad:upd.especialidad||null,porcentaje_base:upd.porcentajeBase,activo:upd.activo}).eq("id",upd.id); setEstilistas(p=>p.map(e=>e.id===upd.id?{...e,...upd}:e)); };
   const addAtencion = async (a) => { const {error} = await db.from("atenciones").insert([a]); if(!error) setAtenciones(p=>[a,...p]); };
+  const deleteAtencion = async (id) => { await db.from("atenciones").delete().eq("id",id); setAtenciones(p=>p.filter(a=>a.id!==id)); };
   const addGastoSalon = async (g) => { const {error} = await db.from("gastos_salon").insert([g]); if(!error) setGastosSalon(p=>[g,...p]); };
   const deleteGastoSalon = async (id) => { await db.from("gastos_salon").delete().eq("id",id); setGastosSalon(p=>p.filter(g=>g.id!==id)); };
   const addDeudaSalon = async (d) => { const {error} = await db.from("deudas_salon").insert([d]); if(!error) setDeudasSalon(p=>[...p,d]); };
@@ -1105,7 +1110,7 @@ export default function App() {
         <div style={{ padding:24 }}>
           {error && <div style={{ background:"#2d1515", border:"1px solid #e8614e", borderRadius:8, padding:16, color:"#e8614e", marginBottom:20, fontSize:14 }}>⚠️ {error}</div>}
           {view==="resumen" && <ResumenGeneral atenciones={atenciones} gastosSalon={gastosSalon} nomina={nomina} deudasSalon={deudasSalon} fpIngresos={fpIngresos} fpGastos={fpGastos} fpDeudas={fpDeudas} />}
-          {view==="atenciones" && <Atenciones atenciones={atenciones} loading={loadingAten} onAdd={addAtencion} estilistas={estilistas} />}
+          {view==="atenciones" && <Atenciones atenciones={atenciones} loading={loadingAten} onAdd={addAtencion} onDelete={deleteAtencion} estilistas={estilistas} />}
           {view==="estilistas" && <Estilistas estilistas={estilistas} loading={loadingEst} onAdd={addEstilista} onDelete={deleteEstilista} onUpdate={updateEstilista} />}
           {view==="gastos_salon" && <GastosSalon gastosSalon={gastosSalon} loading={loading} onAdd={addGastoSalon} onDelete={deleteGastoSalon} />}
           {view==="deudas_salon" && <DeudasSalon deudasSalon={deudasSalon} loading={loading} onAdd={addDeudaSalon} onDelete={deleteDeudaSalon} onUpdate={updateDeudaSalon} />}
