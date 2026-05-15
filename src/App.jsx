@@ -996,19 +996,997 @@ function ResumenGeneral({ atenciones, gastosSalon, nomina, deudasSalon, fpIngres
   );
 }
 
+// ── DESIGN TOKENS ─────────────────────────────────────────────────────────────
+const G = {
+  bg:       "#080808",
+  bgCard:   "#111111",
+  bgInput:  "#1a1a1a",
+  border:   "#2a2a2a",
+  borderGold: "#C9A84C44",
+  gold:     "#C9A84C",
+  goldLight:"#E8C96A",
+  goldDim:  "#C9A84C88",
+  white:    "#F5F0E8",
+  gray:     "#666660",
+  grayMid:  "#999890",
+  red:      "#E05C4B",
+  green:    "#4CAF7D",
+  radius:   14,
+  radiusSm: 8,
+};
+
+const IS = { background:G.bgInput, border:`1px solid ${G.border}`, borderRadius:G.radiusSm, color:G.white, padding:"12px 14px", fontSize:15, width:"100%", boxSizing:"border-box", outline:"none", fontFamily:"inherit" };
+const LS = { fontSize:11, color:G.goldDim, fontWeight:600, letterSpacing:"0.1em", textTransform:"uppercase", display:"block", marginBottom:8 };
+
+// ── GOLD COMPONENTS ───────────────────────────────────────────────────────────
+function GoldCard({ label, value, sub, icon, positive }) {
+  return (
+    <div style={{ background:G.bgCard, border:`1px solid ${G.borderGold}`, borderRadius:G.radius, padding:"16px 18px", display:"flex", flexDirection:"column", gap:6 }}>
+      <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center" }}>
+        <span style={{ fontSize:11, color:G.goldDim, fontWeight:600, letterSpacing:"0.08em", textTransform:"uppercase" }}>{label}</span>
+        {icon && <span style={{ fontSize:20 }}>{icon}</span>}
+      </div>
+      <div style={{ fontSize:22, fontWeight:700, color: positive===false ? G.red : positive===true ? G.green : G.gold, letterSpacing:"-0.02em" }}>{value}</div>
+      {sub && <div style={{ fontSize:12, color:G.gray }}>{sub}</div>}
+    </div>
+  );
+}
+
+function GoldBtn({ children, onClick, disabled, variant="primary", full }) {
+  const styles = {
+    primary: { background:`linear-gradient(135deg, ${G.gold}, ${G.goldLight})`, color:"#080808", border:"none" },
+    ghost:   { background:"transparent", color:G.gold, border:`1px solid ${G.borderGold}` },
+    danger:  { background:"transparent", color:G.red, border:`1px solid ${G.red}44` },
+  };
+  return (
+    <button onClick={onClick} disabled={disabled} style={{ ...styles[variant], padding:"12px 20px", borderRadius:G.radiusSm, cursor:disabled?"not-allowed":"pointer", fontWeight:700, fontSize:14, width:full?"100%":"auto", opacity:disabled?0.5:1, fontFamily:"inherit", transition:"opacity 0.2s", letterSpacing:"0.02em" }}>
+      {children}
+    </button>
+  );
+}
+
+function GoldProgressBar({ value, max, height=6 }) {
+  const pct = Math.min((value/max)*100, 100);
+  const over = value > max;
+  return (
+    <div style={{ background:"#1a1a1a", borderRadius:99, height, overflow:"hidden" }}>
+      <div style={{ width:pct+"%", height:"100%", borderRadius:99, background: over ? G.red : `linear-gradient(90deg, ${G.gold}, ${G.goldLight})`, transition:"width 0.4s ease" }} />
+    </div>
+  );
+}
+
+function GoldSpinner() {
+  return <div style={{ textAlign:"center", padding:60, color:G.goldDim, fontSize:14, letterSpacing:"0.1em" }}>CARGANDO...</div>;
+}
+
+function GoldDivider() {
+  return <div style={{ height:1, background:`linear-gradient(90deg, transparent, ${G.borderGold}, transparent)`, margin:"4px 0" }} />;
+}
+
+// ── HOME SCREEN ───────────────────────────────────────────────────────────────
+function HomeScreen({ onNav, atenciones, gastosSalon, nomina, deudasSalon }) {
+  const mes = mesStr();
+  const hoy = hoyStr();
+  const ingresosMes = atenciones.filter(a=>a.fecha.startsWith(mes)).reduce((s,a)=>s+(a.total||0),0);
+  const gastosMes = gastosSalon.filter(g=>g.fecha.startsWith(mes)).reduce((s,g)=>s+(g.monto||0),0);
+  const nominaMes = nomina.filter(n=>n.mes===mes).reduce((s,n)=>s+(n.sueldo_fijo||0),0);
+  const utilidad = ingresosMes - gastosMes - nominaMes;
+  const atenHoy = atenciones.filter(a=>a.fecha===hoy).length;
+  const recaudadoHoy = atenciones.filter(a=>a.fecha===hoy).reduce((s,a)=>s+(a.total||0),0);
+
+  const modules = [
+    { id:"atenciones",   icon:"✂️",  label:"Atenciones",         sub:"Registrar servicios" },
+    { id:"estilistas",   icon:"💇",  label:"Estilistas",          sub:"Equipo y porcentajes" },
+    { id:"gastos_salon", icon:"💸",  label:"Gastos del salón",    sub:"Control de egresos" },
+    { id:"deudas_salon", icon:"🔗",  label:"Deudas del salón",    sub:"Seguimiento de deudas" },
+    { id:"nomina",       icon:"💼",  label:"Nómina",              sub:"Sueldos y pagos" },
+    { id:"personal",     icon:"👤",  label:"Finanzas personales", sub:"Separación personal" },
+    { id:"resumen",      icon:"📊",  label:"Resumen general",     sub:"Vista completa" },
+  ];
+
+  return (
+    <div style={{ display:"flex", flexDirection:"column", gap:24, paddingBottom:24 }}>
+      {/* Header */}
+      <div style={{ textAlign:"center", padding:"32px 20px 8px" }}>
+        <div style={{ fontSize:11, color:G.goldDim, letterSpacing:"0.2em", textTransform:"uppercase", marginBottom:8 }}>Salón de Belleza</div>
+        <div style={{ fontSize:32, fontWeight:800, color:G.gold, letterSpacing:"-0.02em", lineHeight:1 }}>BERTUCHI</div>
+        <div style={{ fontSize:12, color:G.gray, marginTop:8, letterSpacing:"0.05em" }}>Sistema de gestión exclusivo</div>
+      </div>
+
+      <GoldDivider />
+
+      {/* KPIs del día */}
+      <div style={{ padding:"0 16px" }}>
+        <div style={{ fontSize:11, color:G.goldDim, letterSpacing:"0.12em", textTransform:"uppercase", marginBottom:12 }}>Resumen de hoy</div>
+        <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:10 }}>
+          <GoldCard label="Atenciones hoy" value={atenHoy} icon="✂️" />
+          <GoldCard label="Recaudado hoy" value={fmt(recaudadoHoy)} icon="💰" positive={true} />
+        </div>
+      </div>
+
+      {/* KPIs del mes */}
+      <div style={{ padding:"0 16px" }}>
+        <div style={{ fontSize:11, color:G.goldDim, letterSpacing:"0.12em", textTransform:"uppercase", marginBottom:12 }}>Este mes</div>
+        <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:10 }}>
+          <GoldCard label="Ingresos" value={fmt(ingresosMes)} icon="📈" positive={true} />
+          <GoldCard label="Gastos" value={fmt(gastosMes + nominaMes)} icon="📉" positive={false} />
+        </div>
+        <div style={{ marginTop:10 }}>
+          <GoldCard label="Utilidad del salón" value={fmt(utilidad)} icon="⭐" positive={utilidad >= 0} />
+        </div>
+      </div>
+
+      <GoldDivider />
+
+      {/* Módulos */}
+      <div style={{ padding:"0 16px" }}>
+        <div style={{ fontSize:11, color:G.goldDim, letterSpacing:"0.12em", textTransform:"uppercase", marginBottom:12 }}>Módulos</div>
+        <div style={{ display:"flex", flexDirection:"column", gap:8 }}>
+          {modules.map(m=>(
+            <button key={m.id} onClick={()=>onNav(m.id)} style={{ display:"flex", alignItems:"center", gap:16, background:G.bgCard, border:`1px solid ${G.borderGold}`, borderRadius:G.radius, padding:"16px 18px", cursor:"pointer", textAlign:"left", transition:"all 0.2s", width:"100%" }}
+              onMouseEnter={e=>{ e.currentTarget.style.borderColor=G.gold; e.currentTarget.style.background="#1a1a1a"; }}
+              onMouseLeave={e=>{ e.currentTarget.style.borderColor=G.borderGold; e.currentTarget.style.background=G.bgCard; }}>
+              <span style={{ fontSize:26, width:36, textAlign:"center", flexShrink:0 }}>{m.icon}</span>
+              <div style={{ flex:1 }}>
+                <div style={{ fontSize:15, fontWeight:600, color:G.white, letterSpacing:"0.01em" }}>{m.label}</div>
+                <div style={{ fontSize:12, color:G.gray, marginTop:2 }}>{m.sub}</div>
+              </div>
+              <span style={{ color:G.goldDim, fontSize:18 }}>›</span>
+            </button>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── HEADER BAR ────────────────────────────────────────────────────────────────
+function HeaderBar({ title, onBack }) {
+  return (
+    <div style={{ position:"sticky", top:0, zIndex:100, background:G.bg, borderBottom:`1px solid ${G.borderGold}`, padding:"16px 20px", display:"flex", alignItems:"center", gap:16 }}>
+      {onBack && (
+        <button onClick={onBack} style={{ background:"transparent", border:`1px solid ${G.borderGold}`, borderRadius:G.radiusSm, color:G.gold, padding:"6px 12px", cursor:"pointer", fontSize:18, lineHeight:1, fontFamily:"inherit" }}>‹</button>
+      )}
+      <div style={{ flex:1 }}>
+        <div style={{ fontSize:11, color:G.goldDim, letterSpacing:"0.15em", textTransform:"uppercase" }}>Bertuchi</div>
+        <div style={{ fontSize:18, fontWeight:700, color:G.white, lineHeight:1.2 }}>{title}</div>
+      </div>
+    </div>
+  );
+}
+
+// ── RESTYLED ESTILISTAS ───────────────────────────────────────────────────────
+function EstilistasView({ estilistas, loading, onAdd, onDelete, onUpdate }) {
+  const empty = { nombre:"", telefono:"", especialidad:"", porcentajeBase:50, activo:true };
+  const [form, setForm] = useState(empty);
+  const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
+  const [editId, setEditId] = useState(null);
+  const [confirm, setConfirm] = useState(null);
+  const [showForm, setShowForm] = useState(false);
+
+  const submit = async () => {
+    if (!form.nombre.trim() || saving) return;
+    setSaving(true);
+    if (editId) { await onUpdate({ ...form, id: editId }); setEditId(null); }
+    else await onAdd({ ...form, id:"e"+Date.now(), nombre:form.nombre.trim(), color: COLORES_ESTILISTA[estilistas.length % COLORES_ESTILISTA.length] });
+    setForm(empty); setSaving(false); setSaved(true); setShowForm(false);
+    setTimeout(()=>setSaved(false), 2000);
+  };
+
+  return (
+    <div style={{ padding:"16px", display:"flex", flexDirection:"column", gap:16, paddingBottom:40 }}>
+      <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr 1fr", gap:10 }}>
+        <GoldCard label="Activos" value={estilistas.filter(e=>e.activo).length} icon="💇" />
+        <GoldCard label="% Promedio" value={estilistas.length ? Math.round(estilistas.reduce((s,e)=>s+e.porcentajeBase,0)/estilistas.length)+"%" : "—"} icon="%" />
+        <GoldCard label="Total" value={estilistas.length} icon="👥" />
+      </div>
+
+      <GoldBtn onClick={()=>setShowForm(!showForm)} full>{showForm?"Cerrar formulario":"+ Nuevo estilista"}</GoldBtn>
+
+      {showForm && (
+        <div style={{ background:G.bgCard, border:`1px solid ${G.borderGold}`, borderRadius:G.radius, padding:20, display:"flex", flexDirection:"column", gap:14 }}>
+          <div style={{ fontSize:14, color:G.gold, fontWeight:600, letterSpacing:"0.05em" }}>{editId?"EDITAR ESTILISTA":"NUEVO ESTILISTA"}</div>
+          <div><label style={LS}>Nombre *</label><input style={IS} placeholder="Nombre completo" value={form.nombre} onChange={e=>setForm(f=>({...f,nombre:e.target.value}))} /></div>
+          <div><label style={LS}>Teléfono</label><input style={IS} placeholder="3001234567" value={form.telefono} onChange={e=>setForm(f=>({...f,telefono:e.target.value}))} /></div>
+          <div><label style={LS}>Especialidad</label><input style={IS} placeholder="Colorista, manicurista..." value={form.especialidad} onChange={e=>setForm(f=>({...f,especialidad:e.target.value}))} /></div>
+          <div>
+            <label style={LS}>Porcentaje: <span style={{ color:G.gold, fontWeight:700 }}>{form.porcentajeBase}%</span></label>
+            <input type="range" min="10" max="90" step="5" value={form.porcentajeBase} onChange={e=>setForm(f=>({...f,porcentajeBase:parseInt(e.target.value,10)}))} style={{ width:"100%", accentColor:G.gold, cursor:"pointer", marginBottom:8 }} />
+            <div style={{ display:"flex", borderRadius:4, overflow:"hidden", height:8 }}>
+              <div style={{ width:form.porcentajeBase+"%", background:G.gold, transition:"width 0.2s" }} />
+              <div style={{ flex:1, background:G.green }} />
+            </div>
+            <div style={{ display:"flex", justifyContent:"space-between", fontSize:11, color:G.gray, marginTop:4 }}>
+              <span style={{ color:G.gold }}>Estilista {form.porcentajeBase}%</span>
+              <span style={{ color:G.green }}>Salón {100-form.porcentajeBase}%</span>
+            </div>
+          </div>
+          <label style={{ display:"flex", alignItems:"center", gap:10, cursor:"pointer", fontSize:14, color:G.white }}>
+            <input type="checkbox" checked={form.activo} onChange={e=>setForm(f=>({...f,activo:e.target.checked}))} style={{ accentColor:G.gold, width:18, height:18 }} />
+            Estilista activo
+          </label>
+          <div style={{ display:"flex", gap:10 }}>
+            <GoldBtn onClick={submit} disabled={saving} full>{saving?"Guardando...":saved?"✓ Guardado":editId?"Guardar cambios":"Agregar"}</GoldBtn>
+            {editId && <GoldBtn variant="ghost" onClick={()=>{setEditId(null);setForm(empty);setShowForm(false);}}>Cancelar</GoldBtn>}
+          </div>
+        </div>
+      )}
+
+      {loading && <GoldSpinner />}
+      {!loading && estilistas.length===0 && (
+        <div style={{ textAlign:"center", padding:40, color:G.gray, fontSize:14 }}>Sin estilistas registrados.</div>
+      )}
+      {estilistas.map(e=>(
+        <div key={e.id} style={{ background:G.bgCard, border:`1px solid ${G.borderGold}`, borderRadius:G.radius, padding:16 }}>
+          {confirm===e.id ? (
+            <div style={{ display:"flex", flexDirection:"column", gap:10 }}>
+              <div style={{ fontSize:13, color:G.red }}>¿Eliminar a <strong>{e.nombre}</strong>?</div>
+              <div style={{ display:"flex", gap:8 }}>
+                <GoldBtn variant="danger" onClick={()=>{onDelete(e.id);setConfirm(null);}} full>Sí, eliminar</GoldBtn>
+                <GoldBtn variant="ghost" onClick={()=>setConfirm(null)} full>Cancelar</GoldBtn>
+              </div>
+            </div>
+          ) : (
+            <>
+              <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", marginBottom:12 }}>
+                <div style={{ display:"flex", gap:12, alignItems:"center" }}>
+                  <div style={{ width:44, height:44, borderRadius:"50%", background:e.color+"22", border:`2px solid ${e.color}`, display:"flex", alignItems:"center", justifyContent:"center", fontSize:18, fontWeight:700, color:e.color }}>{e.nombre.charAt(0).toUpperCase()}</div>
+                  <div>
+                    <div style={{ fontSize:15, fontWeight:600, color:e.activo?G.white:G.gray }}>{e.nombre}</div>
+                    {e.especialidad && <div style={{ fontSize:12, color:G.gray }}>{e.especialidad}</div>}
+                    {e.telefono && <div style={{ fontSize:12, color:G.gray }}>📱 {e.telefono}</div>}
+                    {!e.activo && <div style={{ fontSize:11, color:"#f0a030", marginTop:4 }}>Inactivo</div>}
+                  </div>
+                </div>
+                <div style={{ display:"flex", gap:8 }}>
+                  <GoldBtn variant="ghost" onClick={()=>{setEditId(e.id);setForm({nombre:e.nombre,telefono:e.telefono||"",especialidad:e.especialidad||"",porcentajeBase:e.porcentajeBase,activo:e.activo});setShowForm(true);}}>✏️</GoldBtn>
+                  <GoldBtn variant="danger" onClick={()=>setConfirm(e.id)}>🗑</GoldBtn>
+                </div>
+              </div>
+              <div style={{ display:"flex", justifyContent:"space-between", fontSize:12, color:G.gray, marginBottom:6 }}>
+                <span style={{ color:G.gold }}>Estilista {e.porcentajeBase}%</span>
+                <span style={{ color:G.green }}>Salón {100-e.porcentajeBase}%</span>
+              </div>
+              <div style={{ display:"flex", borderRadius:4, overflow:"hidden", height:6 }}>
+                <div style={{ width:e.porcentajeBase+"%", background:G.gold }} />
+                <div style={{ flex:1, background:G.green }} />
+              </div>
+            </>
+          )}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// ── RESTYLED ATENCIONES ───────────────────────────────────────────────────────
+function AtencionesView({ atenciones, loading, onAdd, onDelete, estilistas }) {
+  const hoy = hoyStr();
+  const empty = { fecha:hoy, cliente:"", estilistaId:"", servicios:[], otroServicio:"", subtotal:"", descuento:"0", metodoPago:"Efectivo", nota:"" };
+  const [form, setForm] = useState(empty);
+  const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
+  const [detalle, setDetalle] = useState(null);
+  const [busqueda, setBusqueda] = useState("");
+  const [filtroFecha, setFiltroFecha] = useState("");
+  const [tab, setTab] = useState("registrar");
+
+  const total = Math.max(0, parseInt(form.subtotal||0,10) - parseInt(form.descuento||0,10));
+  const estSel = estilistas.find(e=>e.id===form.estilistaId);
+  const comision = estSel ? Math.round(total*estSel.porcentajeBase/100) : 0;
+  const salon = total - comision;
+
+  const toggle = (s) => setForm(f=>({ ...f, servicios:f.servicios.includes(s)?f.servicios.filter(x=>x!==s):[...f.servicios,s] }));
+
+  const submit = async () => {
+    if (!form.cliente||!form.subtotal||form.servicios.length===0||saving) return;
+    setSaving(true);
+    const svcs = form.otroServicio ? [...form.servicios, form.otroServicio] : form.servicios;
+    const est = estilistas.find(e=>e.id===form.estilistaId);
+    const tot = Math.max(0, parseInt(form.subtotal,10)-parseInt(form.descuento||0,10));
+    await onAdd({
+      id:"a"+Date.now(), fecha:form.fecha, cliente:form.cliente.trim(),
+      estilista_id:form.estilistaId, estilista:est?est.nombre:"", estilista_color:est?est.color:G.gray,
+      porcentaje_estilista:est?est.porcentajeBase:0, servicios:svcs,
+      subtotal:parseInt(form.subtotal,10), descuento:parseInt(form.descuento||0,10), total:tot,
+      comision_estilista:est?Math.round(tot*est.porcentajeBase/100):0,
+      ganancia_salon:est?tot-Math.round(tot*est.porcentajeBase/100):tot,
+      metodo_pago:form.metodoPago, nota:form.nota.trim(), numero:atenciones.length+1,
+    });
+    setForm(empty); setSaving(false); setSaved(true); setTab("historial");
+    setTimeout(()=>setSaved(false),2000);
+  };
+
+  const filtradas = atenciones.filter(a=>{
+    const b=busqueda.toLowerCase();
+    return (b===""||a.cliente.toLowerCase().includes(b)||(a.estilista||"").toLowerCase().includes(b)||(a.servicios||[]).some(s=>s.toLowerCase().includes(b))) && (filtroFecha===""||a.fecha===filtroFecha);
+  });
+
+  const totalHoy = atenciones.filter(a=>a.fecha===hoy).reduce((s,a)=>s+(a.total||0),0);
+  const totalMes = atenciones.filter(a=>a.fecha.startsWith(mesStr())).reduce((s,a)=>s+(a.total||0),0);
+  const salonMes = atenciones.filter(a=>a.fecha.startsWith(mesStr())).reduce((s,a)=>s+(a.ganancia_salon||a.total||0),0);
+
+  if (detalle) {
+    const a = detalle;
+    return (
+      <div style={{ padding:16, paddingBottom:40 }}>
+        <div style={{ display:"flex", gap:10, marginBottom:20 }}>
+          <GoldBtn variant="ghost" onClick={()=>setDetalle(null)}>‹ Volver</GoldBtn>
+          <GoldBtn variant="danger" onClick={()=>{ if(window.confirm("¿Eliminar esta atención?")){ onDelete(a.id); setDetalle(null); } }}>🗑 Eliminar</GoldBtn>
+        </div>
+        <div style={{ background:G.bgCard, border:`1px solid ${G.borderGold}`, borderRadius:G.radius, padding:24, display:"flex", flexDirection:"column", gap:16 }}>
+          <div style={{ display:"flex", justifyContent:"space-between", borderBottom:`1px solid ${G.border}`, paddingBottom:16 }}>
+            <div>
+              <div style={{ fontSize:10, color:G.goldDim, letterSpacing:"0.15em", textTransform:"uppercase" }}>Remisión de atención</div>
+              <div style={{ fontSize:24, fontWeight:800, color:G.gold, marginTop:4 }}>BERTUCHI</div>
+            </div>
+            <div style={{ textAlign:"right" }}>
+              <div style={{ fontSize:12, color:G.gray }}>N° {String(a.numero).padStart(4,"0")}</div>
+              <div style={{ fontSize:12, color:G.gray }}>{a.fecha}</div>
+            </div>
+          </div>
+          <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:10 }}>
+            <div style={{ background:G.bgInput, borderRadius:G.radiusSm, padding:"12px 14px" }}>
+              <div style={{ fontSize:10, color:G.goldDim, textTransform:"uppercase", letterSpacing:"0.1em", marginBottom:4 }}>Cliente</div>
+              <div style={{ fontSize:15, fontWeight:600, color:G.white }}>{a.cliente}</div>
+            </div>
+            {a.estilista && (
+              <div style={{ background:G.bgInput, borderRadius:G.radiusSm, padding:"12px 14px" }}>
+                <div style={{ fontSize:10, color:G.goldDim, textTransform:"uppercase", letterSpacing:"0.1em", marginBottom:4 }}>Estilista</div>
+                <div style={{ fontSize:15, fontWeight:600, color:G.white }}>{a.estilista}</div>
+              </div>
+            )}
+          </div>
+          <div>
+            <div style={{ fontSize:10, color:G.goldDim, textTransform:"uppercase", letterSpacing:"0.1em", marginBottom:10 }}>Servicios</div>
+            {(a.servicios||[]).map((s,i)=>(
+              <div key={i} style={{ padding:"10px 14px", background:G.bgInput, borderRadius:G.radiusSm, marginBottom:6, fontSize:14, color:G.white, borderLeft:`3px solid ${G.gold}` }}>✂ {s}</div>
+            ))}
+          </div>
+          <div style={{ background:G.bgInput, borderRadius:G.radiusSm, padding:16 }}>
+            <div style={{ display:"flex", justifyContent:"space-between", marginBottom:8 }}>
+              <span style={{ fontSize:13, color:G.gray }}>Subtotal</span>
+              <span style={{ fontSize:13, color:G.white }}>{fmt(a.subtotal)}</span>
+            </div>
+            {(a.descuento||0)>0 && (
+              <div style={{ display:"flex", justifyContent:"space-between", marginBottom:8 }}>
+                <span style={{ fontSize:13, color:G.green }}>Descuento</span>
+                <span style={{ fontSize:13, color:G.green }}>− {fmt(a.descuento)}</span>
+              </div>
+            )}
+            <GoldDivider />
+            <div style={{ display:"flex", justifyContent:"space-between", marginTop:8 }}>
+              <span style={{ fontSize:16, fontWeight:700, color:G.white }}>TOTAL</span>
+              <span style={{ fontSize:20, fontWeight:800, color:G.gold }}>{fmt(a.total)}</span>
+            </div>
+            <div style={{ marginTop:8, fontSize:12, color:G.gray }}>Pago: <span style={{ color:G.goldLight }}>{a.metodo_pago}</span></div>
+          </div>
+          {a.estilista && (a.porcentaje_estilista||0)>0 && (
+            <div style={{ background:G.bgInput, borderRadius:G.radiusSm, padding:16 }}>
+              <div style={{ fontSize:10, color:G.goldDim, textTransform:"uppercase", letterSpacing:"0.1em", marginBottom:12 }}>Distribución</div>
+              <div style={{ display:"flex", justifyContent:"space-between", marginBottom:6 }}>
+                <span style={{ fontSize:13, color:G.white }}>💇 {a.estilista} ({a.porcentaje_estilista}%)</span>
+                <span style={{ fontSize:13, fontWeight:600, color:G.gold }}>{fmt(a.comision_estilista)}</span>
+              </div>
+              <div style={{ display:"flex", justifyContent:"space-between", marginBottom:10 }}>
+                <span style={{ fontSize:13, color:G.white }}>✂️ Salón ({100-a.porcentaje_estilista}%)</span>
+                <span style={{ fontSize:13, fontWeight:600, color:G.green }}>{fmt(a.ganancia_salon)}</span>
+              </div>
+              <div style={{ display:"flex", borderRadius:4, overflow:"hidden", height:6 }}>
+                <div style={{ width:a.porcentaje_estilista+"%", background:G.gold }} />
+                <div style={{ flex:1, background:G.green }} />
+              </div>
+            </div>
+          )}
+          {a.nota && <div style={{ fontSize:13, color:G.gray, fontStyle:"italic", borderTop:`1px solid ${G.border}`, paddingTop:12 }}>Nota: {a.nota}</div>}
+          <div style={{ fontSize:11, color:G.gray, textAlign:"center", borderTop:`1px solid ${G.border}`, paddingTop:12, letterSpacing:"0.05em" }}>GRACIAS POR TU VISITA · {new Date().toLocaleDateString("es-CO")}</div>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div style={{ display:"flex", flexDirection:"column", paddingBottom:40 }}>
+      {/* KPIs */}
+      <div style={{ padding:"16px 16px 0" }}>
+        <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:10, marginBottom:10 }}>
+          <GoldCard label="Hoy" value={fmt(totalHoy)} icon="💅" positive={true} />
+          <GoldCard label="Este mes" value={fmt(totalMes)} icon="📅" positive={true} />
+        </div>
+        <GoldCard label="Para el salón este mes" value={fmt(salonMes)} icon="✂️" positive={true} />
+      </div>
+
+      {/* Tabs */}
+      <div style={{ display:"flex", gap:0, padding:"16px 16px 0", borderBottom:`1px solid ${G.border}` }}>
+        {["registrar","historial"].map(t=>(
+          <button key={t} onClick={()=>setTab(t)} style={{ flex:1, padding:"12px", background:"transparent", border:"none", borderBottom: tab===t?`2px solid ${G.gold}`:"2px solid transparent", color: tab===t?G.gold:G.gray, cursor:"pointer", fontSize:13, fontWeight:tab===t?700:400, textTransform:"uppercase", letterSpacing:"0.08em", fontFamily:"inherit", transition:"all 0.2s" }}>
+            {t==="registrar"?"Registrar":"Historial"}
+          </button>
+        ))}
+      </div>
+
+      {tab==="registrar" && (
+        <div style={{ padding:16, display:"flex", flexDirection:"column", gap:14 }}>
+          <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:10 }}>
+            <div><label style={LS}>Fecha</label><input type="date" style={IS} value={form.fecha} onChange={e=>setForm(f=>({...f,fecha:e.target.value}))} /></div>
+            <div><label style={LS}>Método de pago</label>
+              <select style={IS} value={form.metodoPago} onChange={e=>setForm(f=>({...f,metodoPago:e.target.value}))}>
+                {METODOS_PAGO.map(m=><option key={m}>{m}</option>)}
+              </select>
+            </div>
+          </div>
+          <div><label style={LS}>Cliente *</label><input style={IS} placeholder="Nombre del cliente" value={form.cliente} onChange={e=>setForm(f=>({...f,cliente:e.target.value}))} /></div>
+          <div>
+            <label style={LS}>Estilista</label>
+            {estilistas.filter(e=>e.activo).length===0 ? (
+              <div style={{ fontSize:13, color:"#f0a030", padding:"12px 14px", background:G.bgInput, borderRadius:G.radiusSm, border:`1px solid #f0a03044` }}>⚠️ Agrega estilistas primero.</div>
+            ) : (
+              <select style={IS} value={form.estilistaId} onChange={e=>setForm(f=>({...f,estilistaId:e.target.value}))}>
+                <option value="">— Sin asignar —</option>
+                {estilistas.filter(e=>e.activo).map(e=><option key={e.id} value={e.id}>{e.nombre} · {e.porcentajeBase}%</option>)}
+              </select>
+            )}
+          </div>
+          <div>
+            <label style={LS}>Servicios *</label>
+            <div style={{ display:"flex", flexWrap:"wrap", gap:8 }}>
+              {SERVICIOS_DEFAULT.map(s=>(
+                <button key={s} onClick={()=>toggle(s)} style={{ fontSize:12, padding:"7px 12px", borderRadius:20, cursor:"pointer", border: form.servicios.includes(s)?`1px solid ${G.gold}`:`1px solid ${G.border}`, background: form.servicios.includes(s)?"#C9A84C22":G.bgInput, color: form.servicios.includes(s)?G.gold:G.gray, fontFamily:"inherit" }}>{s}</button>
+              ))}
+            </div>
+            <input style={{...IS, marginTop:10}} placeholder="Otro servicio" value={form.otroServicio} onChange={e=>setForm(f=>({...f,otroServicio:e.target.value}))} />
+          </div>
+          <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:10 }}>
+            <div><label style={LS}>Valor (COP) *</label><input type="number" style={IS} placeholder="80000" value={form.subtotal} onChange={e=>setForm(f=>({...f,subtotal:e.target.value}))} /></div>
+            <div><label style={LS}>Descuento</label><input type="number" style={IS} placeholder="0" value={form.descuento} onChange={e=>setForm(f=>({...f,descuento:e.target.value}))} /></div>
+          </div>
+          {form.subtotal && (
+            <div style={{ background:G.bgInput, borderRadius:G.radiusSm, padding:"14px 16px", border:`1px solid ${G.borderGold}` }}>
+              <div style={{ display:"flex", justifyContent:"space-between", marginBottom: estSel?8:0 }}>
+                <span style={{ fontSize:14, color:G.gray }}>Total</span>
+                <span style={{ fontSize:20, fontWeight:800, color:G.gold }}>{fmt(total)}</span>
+              </div>
+              {estSel && (
+                <>
+                  <GoldDivider />
+                  <div style={{ display:"flex", justifyContent:"space-between", marginTop:8, marginBottom:4 }}>
+                    <span style={{ fontSize:12, color:G.gray }}>💇 {estSel.nombre}</span>
+                    <span style={{ fontSize:12, fontWeight:600, color:G.gold }}>{fmt(comision)}</span>
+                  </div>
+                  <div style={{ display:"flex", justifyContent:"space-between", marginBottom:8 }}>
+                    <span style={{ fontSize:12, color:G.gray }}>✂️ Salón</span>
+                    <span style={{ fontSize:12, fontWeight:600, color:G.green }}>{fmt(salon)}</span>
+                  </div>
+                  <div style={{ display:"flex", borderRadius:4, overflow:"hidden", height:5 }}>
+                    <div style={{ width:estSel.porcentajeBase+"%", background:G.gold }} />
+                    <div style={{ flex:1, background:G.green }} />
+                  </div>
+                </>
+              )}
+            </div>
+          )}
+          <div><label style={LS}>Nota</label><input style={IS} placeholder="Próxima cita, observaciones..." value={form.nota} onChange={e=>setForm(f=>({...f,nota:e.target.value}))} /></div>
+          <GoldBtn onClick={submit} disabled={saving} full>{saving?"Guardando...":saved?"✓ Guardada":"Registrar atención"}</GoldBtn>
+        </div>
+      )}
+
+      {tab==="historial" && (
+        <div style={{ padding:16, display:"flex", flexDirection:"column", gap:12 }}>
+          <input style={IS} placeholder="🔍 Buscar cliente, estilista o servicio..." value={busqueda} onChange={e=>setBusqueda(e.target.value)} />
+          <input type="date" style={IS} value={filtroFecha} onChange={e=>setFiltroFecha(e.target.value)} />
+          {loading && <GoldSpinner />}
+          {!loading && filtradas.length===0 && <div style={{ textAlign:"center", padding:40, color:G.gray, fontSize:14 }}>{atenciones.length===0?"Sin atenciones registradas.":"Sin resultados."}</div>}
+          {filtradas.sort((a,b)=>b.fecha.localeCompare(a.fecha)).map(a=>(
+            <div key={a.id} onClick={()=>setDetalle(a)} style={{ background:G.bgCard, border:`1px solid ${G.borderGold}`, borderRadius:G.radius, padding:"14px 16px", cursor:"pointer" }}>
+              <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start" }}>
+                <div style={{ flex:1 }}>
+                  <div style={{ fontSize:15, fontWeight:600, color:G.white }}>{a.cliente}</div>
+                  <div style={{ fontSize:12, color:G.gray, marginTop:2, display:"flex", alignItems:"center", gap:6 }}>
+                    {a.fecha}
+                    {a.estilista && <span style={{ display:"inline-flex", alignItems:"center", gap:4 }}>· <span style={{ width:8, height:8, borderRadius:"50%", background:a.estilista_color||G.gray, display:"inline-block" }} /><span style={{ color:a.estilista_color||G.gray }}>{a.estilista}</span></span>}
+                  </div>
+                  <div style={{ display:"flex", flexWrap:"wrap", gap:4, marginTop:8 }}>
+                    {(a.servicios||[]).slice(0,3).map((s,i)=><span key={i} style={{ fontSize:11, padding:"3px 10px", borderRadius:20, background:"#C9A84C22", color:G.gold, border:`1px solid ${G.borderGold}` }}>{s}</span>)}
+                    {(a.servicios||[]).length>3 && <span style={{ fontSize:11, color:G.gray }}>+{a.servicios.length-3} más</span>}
+                  </div>
+                </div>
+                <div style={{ textAlign:"right", marginLeft:12 }}>
+                  <div style={{ fontSize:18, fontWeight:800, color:G.gold }}>{fmt(a.total)}</div>
+                  {a.estilista && (a.porcentaje_estilista||0)>0 && <div style={{ fontSize:11, color:G.gray, marginTop:2 }}>Salón: <span style={{ color:G.green }}>{fmt(a.ganancia_salon)}</span></div>}
+                  <div style={{ fontSize:11, color:G.gray }}>{a.metodo_pago}</div>
+                  <div style={{ fontSize:11, color:G.gold, marginTop:4 }}>Ver remisión ›</div>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── RESTYLED GASTOS SALON ─────────────────────────────────────────────────────
+function GastosSalonView({ gastosSalon, loading, onAdd, onDelete }) {
+  const hoy = hoyStr(); const mes = mesStr();
+  const empty = { fecha:hoy, categoria:"Arriendo", descripcion:"", monto:"", es_recurrente:false };
+  const [form, setForm] = useState(empty);
+  const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
+  const [confirm, setConfirm] = useState(null);
+  const [showForm, setShowForm] = useState(false);
+  const submit = async () => {
+    if (!form.descripcion||!form.monto||saving) return;
+    setSaving(true);
+    await onAdd({ id:"gs"+Date.now(), ...form, monto:parseInt(form.monto,10) });
+    setForm(empty); setSaving(false); setSaved(true); setShowForm(false);
+    setTimeout(()=>setSaved(false),2000);
+  };
+  const delMes = gastosSalon.filter(g=>g.fecha.startsWith(mes));
+  const totalMes = delMes.reduce((s,g)=>s+g.monto,0);
+  const fijos = delMes.filter(g=>g.es_recurrente).reduce((s,g)=>s+g.monto,0);
+  return (
+    <div style={{ padding:16, display:"flex", flexDirection:"column", gap:16, paddingBottom:40 }}>
+      <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:10 }}>
+        <GoldCard label="Total mes" value={fmt(totalMes)} icon="💸" positive={false} />
+        <GoldCard label="Gastos fijos" value={fmt(fijos)} icon="🔁" />
+      </div>
+      <GoldBtn onClick={()=>setShowForm(!showForm)} full>{showForm?"Cerrar":"+ Registrar gasto"}</GoldBtn>
+      {showForm && (
+        <div style={{ background:G.bgCard, border:`1px solid ${G.borderGold}`, borderRadius:G.radius, padding:20, display:"flex", flexDirection:"column", gap:12 }}>
+          <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:10 }}>
+            <div><label style={LS}>Fecha</label><input type="date" style={IS} value={form.fecha} onChange={e=>setForm(f=>({...f,fecha:e.target.value}))} /></div>
+            <div><label style={LS}>Categoría</label><select style={IS} value={form.categoria} onChange={e=>setForm(f=>({...f,categoria:e.target.value}))}>{CATS_GASTO_SALON.map(c=><option key={c}>{c}</option>)}</select></div>
+          </div>
+          <div><label style={LS}>Descripción *</label><input style={IS} placeholder="Ej: Arriendo mayo" value={form.descripcion} onChange={e=>setForm(f=>({...f,descripcion:e.target.value}))} /></div>
+          <div><label style={LS}>Monto (COP) *</label><input type="number" style={IS} placeholder="500000" value={form.monto} onChange={e=>setForm(f=>({...f,monto:e.target.value}))} /></div>
+          <label style={{ display:"flex", alignItems:"center", gap:10, cursor:"pointer", fontSize:14, color:G.white }}>
+            <input type="checkbox" checked={form.es_recurrente} onChange={e=>setForm(f=>({...f,es_recurrente:e.target.checked}))} style={{ accentColor:G.gold, width:18, height:18 }} />
+            🔁 Gasto fijo / recurrente
+          </label>
+          <GoldBtn onClick={submit} disabled={saving} full>{saving?"Guardando...":saved?"✓ Guardado":"Registrar gasto"}</GoldBtn>
+        </div>
+      )}
+      {loading && <GoldSpinner />}
+      {delMes.sort((a,b)=>b.fecha.localeCompare(a.fecha)).map(g=>(
+        <div key={g.id} style={{ background:G.bgCard, border:`1px solid ${G.borderGold}`, borderRadius:G.radius, padding:"14px 16px" }}>
+          {confirm===g.id ? (
+            <div style={{ display:"flex", gap:8 }}>
+              <GoldBtn variant="danger" onClick={()=>{onDelete(g.id);setConfirm(null);}} full>Eliminar</GoldBtn>
+              <GoldBtn variant="ghost" onClick={()=>setConfirm(null)} full>Cancelar</GoldBtn>
+            </div>
+          ) : (
+            <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center" }}>
+              <div><div style={{ fontSize:14, fontWeight:600, color:G.white }}>{g.descripcion}</div><div style={{ fontSize:12, color:G.gray, marginTop:2 }}>{g.fecha} · {g.categoria}{g.es_recurrente?" · 🔁":""}</div></div>
+              <div style={{ display:"flex", alignItems:"center", gap:10 }}>
+                <span style={{ fontSize:16, fontWeight:700, color:G.red }}>{fmt(g.monto)}</span>
+                <GoldBtn variant="danger" onClick={()=>setConfirm(g.id)}>🗑</GoldBtn>
+              </div>
+            </div>
+          )}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// ── RESTYLED DEUDAS SALON ─────────────────────────────────────────────────────
+function DeudasSalonView({ deudasSalon, loading, onAdd, onDelete, onUpdate }) {
+  const empty = { nombre:"", entidad:"", saldo_inicial:"", saldo_actual:"", cuota_mensual:"", tasa_interes:"", fecha_pago:"", estado:"activa" };
+  const [form, setForm] = useState(empty);
+  const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
+  const [confirm, setConfirm] = useState(null);
+  const [editId, setEditId] = useState(null);
+  const [showForm, setShowForm] = useState(false);
+  const submit = async () => {
+    if (!form.nombre||!form.saldo_actual||saving) return;
+    setSaving(true);
+    const data = { ...form, saldo_inicial:parseInt(form.saldo_inicial||form.saldo_actual,10), saldo_actual:parseInt(form.saldo_actual,10), cuota_mensual:parseInt(form.cuota_mensual||0,10), tasa_interes:parseFloat(form.tasa_interes||0) };
+    if (editId) { await onUpdate({...data,id:editId}); setEditId(null); } else await onAdd({ id:"ds"+Date.now(), ...data });
+    setForm(empty); setSaving(false); setSaved(true); setShowForm(false);
+    setTimeout(()=>setSaved(false),2000);
+  };
+  const totalDeuda = deudasSalon.filter(d=>d.estado==="activa").reduce((s,d)=>s+d.saldo_actual,0);
+  const cuotasTotal = deudasSalon.filter(d=>d.estado==="activa").reduce((s,d)=>s+d.cuota_mensual,0);
+  return (
+    <div style={{ padding:16, display:"flex", flexDirection:"column", gap:16, paddingBottom:40 }}>
+      <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:10 }}>
+        <GoldCard label="Deuda total" value={fmt(totalDeuda)} icon="🔗" positive={false} />
+        <GoldCard label="Cuota mensual" value={fmt(cuotasTotal)} icon="📆" />
+      </div>
+      <GoldBtn onClick={()=>setShowForm(!showForm)} full>{showForm?"Cerrar":"+ Agregar deuda"}</GoldBtn>
+      {showForm && (
+        <div style={{ background:G.bgCard, border:`1px solid ${G.borderGold}`, borderRadius:G.radius, padding:20, display:"flex", flexDirection:"column", gap:12 }}>
+          <div><label style={LS}>Nombre *</label><input style={IS} placeholder="Préstamo, proveedor..." value={form.nombre} onChange={e=>setForm(f=>({...f,nombre:e.target.value}))} /></div>
+          <div><label style={LS}>Entidad</label><input style={IS} placeholder="Bancolombia, proveedor X" value={form.entidad} onChange={e=>setForm(f=>({...f,entidad:e.target.value}))} /></div>
+          <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:10 }}>
+            <div><label style={LS}>Saldo inicial</label><input type="number" style={IS} placeholder="5000000" value={form.saldo_inicial} onChange={e=>setForm(f=>({...f,saldo_inicial:e.target.value}))} /></div>
+            <div><label style={LS}>Saldo actual *</label><input type="number" style={IS} placeholder="3500000" value={form.saldo_actual} onChange={e=>setForm(f=>({...f,saldo_actual:e.target.value}))} /></div>
+          </div>
+          <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:10 }}>
+            <div><label style={LS}>Cuota mensual</label><input type="number" style={IS} placeholder="350000" value={form.cuota_mensual} onChange={e=>setForm(f=>({...f,cuota_mensual:e.target.value}))} /></div>
+            <div><label style={LS}>Tasa interés %</label><input type="number" style={IS} placeholder="1.5" value={form.tasa_interes} onChange={e=>setForm(f=>({...f,tasa_interes:e.target.value}))} /></div>
+          </div>
+          <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:10 }}>
+            <div><label style={LS}>Día de pago</label><input type="number" style={IS} placeholder="15" value={form.fecha_pago} onChange={e=>setForm(f=>({...f,fecha_pago:e.target.value}))} /></div>
+            <div><label style={LS}>Estado</label><select style={IS} value={form.estado} onChange={e=>setForm(f=>({...f,estado:e.target.value}))}><option value="activa">Activa</option><option value="pagada">Pagada</option><option value="en mora">En mora</option></select></div>
+          </div>
+          <div style={{ display:"flex", gap:8 }}>
+            <GoldBtn onClick={submit} disabled={saving} full>{saving?"Guardando...":saved?"✓ Guardado":editId?"Guardar":"Agregar deuda"}</GoldBtn>
+            {editId && <GoldBtn variant="ghost" onClick={()=>{setEditId(null);setForm(empty);setShowForm(false);}}>Cancelar</GoldBtn>}
+          </div>
+        </div>
+      )}
+      {loading && <GoldSpinner />}
+      {deudasSalon.map(d=>{
+        const avance = d.saldo_inicial>0?((d.saldo_inicial-d.saldo_actual)/d.saldo_inicial)*100:0;
+        return (
+          <div key={d.id} style={{ background:G.bgCard, border:`1px solid ${G.borderGold}`, borderRadius:G.radius, padding:16 }}>
+            {confirm===d.id ? (
+              <div style={{ display:"flex", gap:8 }}>
+                <GoldBtn variant="danger" onClick={()=>{onDelete(d.id);setConfirm(null);}} full>Eliminar</GoldBtn>
+                <GoldBtn variant="ghost" onClick={()=>setConfirm(null)} full>Cancelar</GoldBtn>
+              </div>
+            ) : (
+              <>
+                <div style={{ display:"flex", justifyContent:"space-between", marginBottom:12 }}>
+                  <div>
+                    <div style={{ fontSize:15, fontWeight:600, color:G.white }}>{d.nombre}</div>
+                    <div style={{ fontSize:12, color:G.gray }}>{d.entidad}{d.fecha_pago?` · Día ${d.fecha_pago}`:""}</div>
+                    <span style={{ fontSize:11, padding:"3px 10px", borderRadius:20, background:d.estado==="pagada"?G.green+"22":d.estado==="en mora"?G.red+"22":"#f0a03022", color:d.estado==="pagada"?G.green:d.estado==="en mora"?G.red:"#f0a030", marginTop:6, display:"inline-block" }}>{d.estado}</span>
+                  </div>
+                  <div style={{ display:"flex", gap:8, alignItems:"flex-start" }}>
+                    <GoldBtn variant="ghost" onClick={()=>{setEditId(d.id);setForm({nombre:d.nombre,entidad:d.entidad||"",saldo_inicial:d.saldo_inicial,saldo_actual:d.saldo_actual,cuota_mensual:d.cuota_mensual,tasa_interes:d.tasa_interes,fecha_pago:d.fecha_pago,estado:d.estado});setShowForm(true);}}>✏️</GoldBtn>
+                    <GoldBtn variant="danger" onClick={()=>setConfirm(d.id)}>🗑</GoldBtn>
+                  </div>
+                </div>
+                <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr 1fr", gap:8, marginBottom:10 }}>
+                  <div><div style={{ fontSize:10, color:G.goldDim, textTransform:"uppercase" }}>Saldo</div><div style={{ fontSize:14, fontWeight:700, color:G.red }}>{fmt(d.saldo_actual)}</div></div>
+                  <div><div style={{ fontSize:10, color:G.goldDim, textTransform:"uppercase" }}>Cuota</div><div style={{ fontSize:14, color:G.white }}>{fmt(d.cuota_mensual)}</div></div>
+                  <div><div style={{ fontSize:10, color:G.goldDim, textTransform:"uppercase" }}>Avance</div><div style={{ fontSize:14, color:G.green }}>{avance.toFixed(0)}%</div></div>
+                </div>
+                <GoldProgressBar value={d.saldo_inicial-d.saldo_actual} max={d.saldo_inicial||d.saldo_actual} />
+              </>
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+// ── RESTYLED NOMINA ───────────────────────────────────────────────────────────
+function NominaView({ nomina, loading, onAdd, onDelete, onUpdate }) {
+  const mes = mesStr();
+  const empty = { nombre:"", cargo:"", sueldo_fijo:"", fecha_pago:"", estado:"pendiente", es_dueno:false, mes };
+  const [form, setForm] = useState(empty);
+  const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
+  const [confirm, setConfirm] = useState(null);
+  const [showForm, setShowForm] = useState(false);
+  const submit = async () => {
+    if (!form.nombre||!form.sueldo_fijo||saving) return;
+    setSaving(true);
+    await onAdd({ id:"nm"+Date.now(), ...form, sueldo_fijo:parseInt(form.sueldo_fijo,10) });
+    setForm(empty); setSaving(false); setSaved(true); setShowForm(false);
+    setTimeout(()=>setSaved(false),2000);
+  };
+  const delMes = nomina.filter(n=>n.mes===mes);
+  const totalNomina = delMes.reduce((s,n)=>s+(n.sueldo_fijo||0),0);
+  const pendientes = delMes.filter(n=>n.estado==="pendiente").length;
+  return (
+    <div style={{ padding:16, display:"flex", flexDirection:"column", gap:16, paddingBottom:40 }}>
+      <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:10 }}>
+        <GoldCard label="Nómina del mes" value={fmt(totalNomina)} icon="💼" positive={false} />
+        <GoldCard label="Pagos pendientes" value={pendientes} icon="⏳" positive={pendientes===0} />
+      </div>
+      <GoldBtn onClick={()=>setShowForm(!showForm)} full>{showForm?"Cerrar":"+ Agregar a nómina"}</GoldBtn>
+      {showForm && (
+        <div style={{ background:G.bgCard, border:`1px solid ${G.borderGold}`, borderRadius:G.radius, padding:20, display:"flex", flexDirection:"column", gap:12 }}>
+          <div><label style={LS}>Nombre *</label><input style={IS} placeholder="Nombre del empleado" value={form.nombre} onChange={e=>setForm(f=>({...f,nombre:e.target.value}))} /></div>
+          <div><label style={LS}>Cargo</label><input style={IS} placeholder="Estilista, recepcionista, dueño..." value={form.cargo} onChange={e=>setForm(f=>({...f,cargo:e.target.value}))} /></div>
+          <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:10 }}>
+            <div><label style={LS}>Sueldo fijo *</label><input type="number" style={IS} placeholder="1500000" value={form.sueldo_fijo} onChange={e=>setForm(f=>({...f,sueldo_fijo:e.target.value}))} /></div>
+            <div><label style={LS}>Día de pago</label><input type="number" style={IS} placeholder="30" value={form.fecha_pago} onChange={e=>setForm(f=>({...f,fecha_pago:e.target.value}))} /></div>
+          </div>
+          <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:10 }}>
+            <div><label style={LS}>Estado</label><select style={IS} value={form.estado} onChange={e=>setForm(f=>({...f,estado:e.target.value}))}><option value="pendiente">Pendiente</option><option value="pagado">Pagado</option></select></div>
+            <div><label style={LS}>Mes</label><input style={IS} value={form.mes} onChange={e=>setForm(f=>({...f,mes:e.target.value}))} /></div>
+          </div>
+          <label style={{ display:"flex", alignItems:"center", gap:10, cursor:"pointer", fontSize:14, color:G.white }}>
+            <input type="checkbox" checked={form.es_dueno} onChange={e=>setForm(f=>({...f,es_dueno:e.target.checked}))} style={{ accentColor:G.gold, width:18, height:18 }} />
+            👑 Es el dueño
+          </label>
+          <GoldBtn onClick={submit} disabled={saving} full>{saving?"Guardando...":saved?"✓ Guardado":"Agregar"}</GoldBtn>
+        </div>
+      )}
+      {loading && <GoldSpinner />}
+      {delMes.map(n=>(
+        <div key={n.id} style={{ background:G.bgCard, border:`1px solid ${G.borderGold}`, borderRadius:G.radius, padding:16 }}>
+          {confirm===n.id ? (
+            <div style={{ display:"flex", gap:8 }}>
+              <GoldBtn variant="danger" onClick={()=>{onDelete(n.id);setConfirm(null);}} full>Eliminar</GoldBtn>
+              <GoldBtn variant="ghost" onClick={()=>setConfirm(null)} full>Cancelar</GoldBtn>
+            </div>
+          ) : (
+            <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center" }}>
+              <div>
+                <div style={{ display:"flex", alignItems:"center", gap:8 }}>
+                  <div style={{ fontSize:15, fontWeight:600, color:G.white }}>{n.nombre}</div>
+                  {n.es_dueno && <span style={{ fontSize:11, padding:"2px 8px", borderRadius:20, background:"#C9A84C22", color:G.gold }}>👑 Dueño</span>}
+                </div>
+                <div style={{ fontSize:12, color:G.gray, marginTop:2 }}>{n.cargo}{n.fecha_pago?` · Día ${n.fecha_pago}`:""}</div>
+              </div>
+              <div style={{ display:"flex", alignItems:"center", gap:10 }}>
+                <div style={{ textAlign:"right" }}>
+                  <div style={{ fontSize:16, fontWeight:700, color:G.gold }}>{fmt(n.sueldo_fijo)}</div>
+                  <button onClick={()=>onUpdate({...n,estado:n.estado==="pagado"?"pendiente":"pagado"})} style={{ fontSize:11, padding:"4px 12px", borderRadius:20, border:"none", cursor:"pointer", background:n.estado==="pagado"?G.green+"22":"#f0a03022", color:n.estado==="pagado"?G.green:"#f0a030", marginTop:4, fontFamily:"inherit" }}>
+                    {n.estado==="pagado"?"✓ Pagado":"⏳ Pendiente"}
+                  </button>
+                </div>
+                <GoldBtn variant="danger" onClick={()=>setConfirm(n.id)}>🗑</GoldBtn>
+              </div>
+            </div>
+          )}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// ── RESTYLED FINANZAS PERSONALES ──────────────────────────────────────────────
+function FinanzasPersonalesView({ fpIngresos, fpGastos, fpDeudas, loading, onAddIngreso, onAddGasto, onAddDeuda, onDeleteIngreso, onDeleteGasto, onDeleteDeuda, onUpdateDeuda }) {
+  const mes = mesStr(); const hoy = hoyStr();
+  const [tab, setTab] = useState("resumen");
+  const emptyIng = { fecha:hoy, categoria:"Sueldo del salón", descripcion:"", monto:"" };
+  const emptyGas = { fecha:hoy, categoria:"Vivienda", descripcion:"", monto:"" };
+  const emptyDeu = { nombre:"", entidad:"", saldo_inicial:"", saldo_actual:"", cuota_mensual:"", fecha_pago:"", estado:"activa" };
+  const [formIng, setFormIng] = useState(emptyIng);
+  const [formGas, setFormGas] = useState(emptyGas);
+  const [formDeu, setFormDeu] = useState(emptyDeu);
+  const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
+  const [showForm, setShowForm] = useState(false);
+  const [confirmDeu, setConfirmDeu] = useState(null);
+
+  const ingMes = fpIngresos.filter(i=>i.fecha.startsWith(mes)).reduce((s,i)=>s+(i.monto||0),0);
+  const gasMes = fpGastos.filter(g=>g.fecha.startsWith(mes)).reduce((s,g)=>s+(g.monto||0),0);
+  const balMes = ingMes - gasMes;
+  const totalDeudas = fpDeudas.filter(d=>d.estado==="activa").reduce((s,d)=>s+(d.saldo_actual||0),0);
+  const cuotasDeudas = fpDeudas.filter(d=>d.estado==="activa").reduce((s,d)=>s+(d.cuota_mensual||0),0);
+  const nivelEnd = ingMes>0?(cuotasDeudas/ingMes)*100:0;
+
+  const submitIng = async () => { if(!formIng.descripcion||!formIng.monto||saving) return; setSaving(true); await onAddIngreso({id:"fpi"+Date.now(),...formIng,monto:parseInt(formIng.monto,10)}); setFormIng(emptyIng); setSaving(false); setSaved("ing"); setShowForm(false); setTimeout(()=>setSaved(false),2000); };
+  const submitGas = async () => { if(!formGas.descripcion||!formGas.monto||saving) return; setSaving(true); await onAddGasto({id:"fpg"+Date.now(),...formGas,monto:parseInt(formGas.monto,10)}); setFormGas(emptyGas); setSaving(false); setSaved("gas"); setShowForm(false); setTimeout(()=>setSaved(false),2000); };
+  const submitDeu = async () => { if(!formDeu.nombre||!formDeu.saldo_actual||saving) return; setSaving(true); await onAddDeuda({id:"fpd"+Date.now(),...formDeu,saldo_inicial:parseInt(formDeu.saldo_inicial||formDeu.saldo_actual,10),saldo_actual:parseInt(formDeu.saldo_actual,10),cuota_mensual:parseInt(formDeu.cuota_mensual||0,10)}); setFormDeu(emptyDeu); setSaving(false); setSaved("deu"); setShowForm(false); setTimeout(()=>setSaved(false),2000); };
+
+  const tabs = [{id:"resumen",label:"Resumen"},{id:"ingresos",label:"Ingresos"},{id:"gastos",label:"Gastos"},{id:"deudas",label:"Deudas"}];
+
+  return (
+    <div style={{ display:"flex", flexDirection:"column", paddingBottom:40 }}>
+      <div style={{ padding:"16px 16px 0" }}>
+        <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:10, marginBottom:10 }}>
+          <GoldCard label="Ingresos" value={fmt(ingMes)} icon="💰" positive={true} />
+          <GoldCard label="Gastos" value={fmt(gasMes)} icon="💸" positive={false} />
+        </div>
+        <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:10 }}>
+          <GoldCard label="Balance" value={fmt(balMes)} icon="⚖️" positive={balMes>=0} />
+          <GoldCard label="Endeudamiento" value={nivelEnd.toFixed(1)+"%"} icon="⚠️" positive={nivelEnd<=30} />
+        </div>
+      </div>
+
+      <div style={{ display:"flex", gap:0, padding:"16px 16px 0", borderBottom:`1px solid ${G.border}`, overflowX:"auto" }}>
+        {tabs.map(t=>(
+          <button key={t.id} onClick={()=>{setTab(t.id);setShowForm(false);}} style={{ flex:1, padding:"12px 8px", background:"transparent", border:"none", borderBottom:tab===t.id?`2px solid ${G.gold}`:"2px solid transparent", color:tab===t.id?G.gold:G.gray, cursor:"pointer", fontSize:12, fontWeight:tab===t.id?700:400, textTransform:"uppercase", letterSpacing:"0.08em", fontFamily:"inherit", whiteSpace:"nowrap" }}>{t.label}</button>
+        ))}
+      </div>
+
+      <div style={{ padding:16, display:"flex", flexDirection:"column", gap:12 }}>
+        {tab==="resumen" && (
+          <>
+            <div style={{ background:G.bgCard, border:`1px solid ${G.borderGold}`, borderRadius:G.radius, padding:16 }}>
+              <div style={{ fontSize:11, color:G.goldDim, textTransform:"uppercase", letterSpacing:"0.1em", marginBottom:12 }}>Ingresos del mes</div>
+              {fpIngresos.filter(i=>i.fecha.startsWith(mes)).length===0 ? <div style={{ color:G.gray, fontSize:13 }}>Sin registros.</div> :
+                fpIngresos.filter(i=>i.fecha.startsWith(mes)).map(i=>(
+                  <div key={i.id} style={{ display:"flex", justifyContent:"space-between", padding:"8px 0", borderBottom:`1px solid ${G.border}` }}>
+                    <span style={{ fontSize:13, color:G.white }}>{i.descripcion}</span>
+                    <div style={{ display:"flex", gap:10, alignItems:"center" }}>
+                      <span style={{ fontSize:13, fontWeight:600, color:G.green }}>{fmt(i.monto)}</span>
+                      <button onClick={()=>onDeleteIngreso(i.id)} style={{ background:"transparent", border:"none", color:G.red, cursor:"pointer", fontSize:14 }}>🗑</button>
+                    </div>
+                  </div>
+                ))
+              }
+            </div>
+            <div style={{ background:G.bgCard, border:`1px solid ${G.borderGold}`, borderRadius:G.radius, padding:16 }}>
+              <div style={{ fontSize:11, color:G.goldDim, textTransform:"uppercase", letterSpacing:"0.1em", marginBottom:12 }}>Gastos del mes</div>
+              {fpGastos.filter(g=>g.fecha.startsWith(mes)).length===0 ? <div style={{ color:G.gray, fontSize:13 }}>Sin registros.</div> :
+                fpGastos.filter(g=>g.fecha.startsWith(mes)).map(g=>(
+                  <div key={g.id} style={{ display:"flex", justifyContent:"space-between", padding:"8px 0", borderBottom:`1px solid ${G.border}` }}>
+                    <span style={{ fontSize:13, color:G.white }}>{g.descripcion}</span>
+                    <div style={{ display:"flex", gap:10, alignItems:"center" }}>
+                      <span style={{ fontSize:13, fontWeight:600, color:G.red }}>{fmt(g.monto)}</span>
+                      <button onClick={()=>onDeleteGasto(g.id)} style={{ background:"transparent", border:"none", color:G.red, cursor:"pointer", fontSize:14 }}>🗑</button>
+                    </div>
+                  </div>
+                ))
+              }
+            </div>
+          </>
+        )}
+
+        {tab==="ingresos" && (
+          <>
+            <GoldBtn onClick={()=>setShowForm(!showForm)} full>{showForm?"Cerrar":"+ Registrar ingreso"}</GoldBtn>
+            {showForm && (
+              <div style={{ background:G.bgCard, border:`1px solid ${G.borderGold}`, borderRadius:G.radius, padding:20, display:"flex", flexDirection:"column", gap:12 }}>
+                <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:10 }}>
+                  <div><label style={LS}>Fecha</label><input type="date" style={IS} value={formIng.fecha} onChange={e=>setFormIng(f=>({...f,fecha:e.target.value}))} /></div>
+                  <div><label style={LS}>Categoría</label><select style={IS} value={formIng.categoria} onChange={e=>setFormIng(f=>({...f,categoria:e.target.value}))}>{CATS_INGRESO_PERSONAL.map(c=><option key={c}>{c}</option>)}</select></div>
+                </div>
+                <div><label style={LS}>Descripción *</label><input style={IS} placeholder="Ej: Sueldo mayo" value={formIng.descripcion} onChange={e=>setFormIng(f=>({...f,descripcion:e.target.value}))} /></div>
+                <div><label style={LS}>Monto *</label><input type="number" style={IS} placeholder="2000000" value={formIng.monto} onChange={e=>setFormIng(f=>({...f,monto:e.target.value}))} /></div>
+                <GoldBtn onClick={submitIng} disabled={saving} full>{saved==="ing"?"✓ Guardado":"Registrar"}</GoldBtn>
+              </div>
+            )}
+            {fpIngresos.sort((a,b)=>b.fecha.localeCompare(a.fecha)).map(i=>(
+              <div key={i.id} style={{ background:G.bgCard, border:`1px solid ${G.borderGold}`, borderRadius:G.radius, padding:"14px 16px", display:"flex", justifyContent:"space-between", alignItems:"center" }}>
+                <div><div style={{ fontSize:14, fontWeight:600, color:G.white }}>{i.descripcion}</div><div style={{ fontSize:12, color:G.gray }}>{i.fecha} · {i.categoria}</div></div>
+                <div style={{ display:"flex", alignItems:"center", gap:10 }}>
+                  <span style={{ fontSize:16, fontWeight:700, color:G.green }}>{fmt(i.monto)}</span>
+                  <GoldBtn variant="danger" onClick={()=>onDeleteIngreso(i.id)}>🗑</GoldBtn>
+                </div>
+              </div>
+            ))}
+          </>
+        )}
+
+        {tab==="gastos" && (
+          <>
+            <GoldBtn onClick={()=>setShowForm(!showForm)} full>{showForm?"Cerrar":"+ Registrar gasto"}</GoldBtn>
+            {showForm && (
+              <div style={{ background:G.bgCard, border:`1px solid ${G.borderGold}`, borderRadius:G.radius, padding:20, display:"flex", flexDirection:"column", gap:12 }}>
+                <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:10 }}>
+                  <div><label style={LS}>Fecha</label><input type="date" style={IS} value={formGas.fecha} onChange={e=>setFormGas(f=>({...f,fecha:e.target.value}))} /></div>
+                  <div><label style={LS}>Categoría</label><select style={IS} value={formGas.categoria} onChange={e=>setFormGas(f=>({...f,categoria:e.target.value}))}>{CATS_GASTO_PERSONAL.map(c=><option key={c}>{c}</option>)}</select></div>
+                </div>
+                <div><label style={LS}>Descripción *</label><input style={IS} placeholder="Ej: Arriendo" value={formGas.descripcion} onChange={e=>setFormGas(f=>({...f,descripcion:e.target.value}))} /></div>
+                <div><label style={LS}>Monto *</label><input type="number" style={IS} placeholder="800000" value={formGas.monto} onChange={e=>setFormGas(f=>({...f,monto:e.target.value}))} /></div>
+                <GoldBtn onClick={submitGas} disabled={saving} full>{saved==="gas"?"✓ Guardado":"Registrar"}</GoldBtn>
+              </div>
+            )}
+            {fpGastos.sort((a,b)=>b.fecha.localeCompare(a.fecha)).map(g=>(
+              <div key={g.id} style={{ background:G.bgCard, border:`1px solid ${G.borderGold}`, borderRadius:G.radius, padding:"14px 16px", display:"flex", justifyContent:"space-between", alignItems:"center" }}>
+                <div><div style={{ fontSize:14, fontWeight:600, color:G.white }}>{g.descripcion}</div><div style={{ fontSize:12, color:G.gray }}>{g.fecha} · {g.categoria}</div></div>
+                <div style={{ display:"flex", alignItems:"center", gap:10 }}>
+                  <span style={{ fontSize:16, fontWeight:700, color:G.red }}>{fmt(g.monto)}</span>
+                  <GoldBtn variant="danger" onClick={()=>onDeleteGasto(g.id)}>🗑</GoldBtn>
+                </div>
+              </div>
+            ))}
+          </>
+        )}
+
+        {tab==="deudas" && (
+          <>
+            <GoldBtn onClick={()=>setShowForm(!showForm)} full>{showForm?"Cerrar":"+ Agregar deuda"}</GoldBtn>
+            {showForm && (
+              <div style={{ background:G.bgCard, border:`1px solid ${G.borderGold}`, borderRadius:G.radius, padding:20, display:"flex", flexDirection:"column", gap:12 }}>
+                <div><label style={LS}>Nombre *</label><input style={IS} placeholder="Tarjeta, préstamo..." value={formDeu.nombre} onChange={e=>setFormDeu(f=>({...f,nombre:e.target.value}))} /></div>
+                <div><label style={LS}>Entidad</label><input style={IS} placeholder="Bancolombia..." value={formDeu.entidad} onChange={e=>setFormDeu(f=>({...f,entidad:e.target.value}))} /></div>
+                <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:10 }}>
+                  <div><label style={LS}>Saldo inicial</label><input type="number" style={IS} placeholder="5000000" value={formDeu.saldo_inicial} onChange={e=>setFormDeu(f=>({...f,saldo_inicial:e.target.value}))} /></div>
+                  <div><label style={LS}>Saldo actual *</label><input type="number" style={IS} placeholder="3000000" value={formDeu.saldo_actual} onChange={e=>setFormDeu(f=>({...f,saldo_actual:e.target.value}))} /></div>
+                </div>
+                <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:10 }}>
+                  <div><label style={LS}>Cuota</label><input type="number" style={IS} placeholder="300000" value={formDeu.cuota_mensual} onChange={e=>setFormDeu(f=>({...f,cuota_mensual:e.target.value}))} /></div>
+                  <div><label style={LS}>Día de pago</label><input type="number" style={IS} placeholder="15" value={formDeu.fecha_pago} onChange={e=>setFormDeu(f=>({...f,fecha_pago:e.target.value}))} /></div>
+                </div>
+                <div><label style={LS}>Estado</label><select style={IS} value={formDeu.estado} onChange={e=>setFormDeu(f=>({...f,estado:e.target.value}))}><option value="activa">Activa</option><option value="pagada">Pagada</option><option value="en mora">En mora</option></select></div>
+                <GoldBtn onClick={submitDeu} disabled={saving} full>{saved==="deu"?"✓ Guardado":"Agregar deuda"}</GoldBtn>
+              </div>
+            )}
+            {fpDeudas.map(d=>{
+              const avance = d.saldo_inicial>0?((d.saldo_inicial-d.saldo_actual)/d.saldo_inicial)*100:0;
+              return (
+                <div key={d.id} style={{ background:G.bgCard, border:`1px solid ${G.borderGold}`, borderRadius:G.radius, padding:16 }}>
+                  {confirmDeu===d.id ? (
+                    <div style={{ display:"flex", gap:8 }}>
+                      <GoldBtn variant="danger" onClick={()=>{onDeleteDeuda(d.id);setConfirmDeu(null);}} full>Eliminar</GoldBtn>
+                      <GoldBtn variant="ghost" onClick={()=>setConfirmDeu(null)} full>Cancelar</GoldBtn>
+                    </div>
+                  ) : (
+                    <>
+                      <div style={{ display:"flex", justifyContent:"space-between", marginBottom:10 }}>
+                        <div>
+                          <div style={{ fontSize:14, fontWeight:600, color:G.white }}>{d.nombre}</div>
+                          <div style={{ fontSize:12, color:G.gray }}>{d.entidad}{d.fecha_pago?` · Día ${d.fecha_pago}`:""}</div>
+                        </div>
+                        <div style={{ display:"flex", gap:8, alignItems:"flex-start" }}>
+                          <span style={{ fontSize:11, padding:"3px 10px", borderRadius:20, background:d.estado==="pagada"?G.green+"22":G.red+"22", color:d.estado==="pagada"?G.green:G.red }}>{d.estado}</span>
+                          <GoldBtn variant="danger" onClick={()=>setConfirmDeu(d.id)}>🗑</GoldBtn>
+                        </div>
+                      </div>
+                      <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:8, marginBottom:10 }}>
+                        <div><div style={{ fontSize:10, color:G.goldDim, textTransform:"uppercase" }}>Saldo</div><div style={{ fontSize:14, fontWeight:700, color:G.red }}>{fmt(d.saldo_actual)}</div></div>
+                        <div><div style={{ fontSize:10, color:G.goldDim, textTransform:"uppercase" }}>Cuota</div><div style={{ fontSize:14, color:G.white }}>{fmt(d.cuota_mensual)}</div></div>
+                      </div>
+                      <GoldProgressBar value={d.saldo_inicial-d.saldo_actual} max={d.saldo_inicial||d.saldo_actual} />
+                    </>
+                  )}
+                </div>
+              );
+            })}
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ── RESTYLED RESUMEN ──────────────────────────────────────────────────────────
+function ResumenView({ atenciones, gastosSalon, nomina, deudasSalon, fpIngresos, fpGastos, fpDeudas }) {
+  const mes = mesStr();
+  const ingresosSalon = atenciones.filter(a=>a.fecha.startsWith(mes)).reduce((s,a)=>s+(a.total||0),0);
+  const gastosSalonMes = gastosSalon.filter(g=>g.fecha.startsWith(mes)).reduce((s,g)=>s+(g.monto||0),0);
+  const nominaMes = nomina.filter(n=>n.mes===mes).reduce((s,n)=>s+(n.sueldo_fijo||0),0);
+  const utilidadSalon = ingresosSalon - gastosSalonMes - nominaMes;
+  const deudaSalonTotal = deudasSalon.filter(d=>d.estado==="activa").reduce((s,d)=>s+(d.saldo_actual||0),0);
+  const ingPersonal = fpIngresos.filter(i=>i.fecha.startsWith(mes)).reduce((s,i)=>s+(i.monto||0),0);
+  const gasPersonal = fpGastos.filter(g=>g.fecha.startsWith(mes)).reduce((s,g)=>s+(g.monto||0),0);
+  const balPersonal = ingPersonal - gasPersonal;
+  const deudaPersonalTotal = fpDeudas.filter(d=>d.estado==="activa").reduce((s,d)=>s+(d.saldo_actual||0),0);
+
+  return (
+    <div style={{ padding:16, display:"flex", flexDirection:"column", gap:16, paddingBottom:40 }}>
+      <div style={{ background:G.bgCard, border:`1px solid ${G.borderGold}`, borderRadius:G.radius, padding:16, fontSize:13, color:G.gray, borderLeft:`4px solid ${G.gold}` }}>
+        💡 <strong style={{ color:G.white }}>Regla de oro:</strong> La utilidad del salón no es dinero del dueño. El dueño solo toca su sueldo. Lo que queda es de la empresa.
+      </div>
+
+      <div style={{ background:G.bgCard, border:`1px solid ${G.borderGold}`, borderRadius:G.radius, padding:20 }}>
+        <div style={{ fontSize:13, color:G.gold, fontWeight:700, letterSpacing:"0.1em", textTransform:"uppercase", marginBottom:16 }}>✂️ Salón Bertuchi</div>
+        {[
+          { label:"Ingresos", value:fmt(ingresosSalon), color:G.green },
+          { label:"Gastos operativos", value:fmt(gastosSalonMes), color:G.red },
+          { label:"Nómina", value:fmt(nominaMes), color:"#f0a030" },
+          { label:"Utilidad neta", value:fmt(utilidadSalon), color:utilidadSalon>=0?G.green:G.red, bold:true },
+          { label:"Deuda total", value:fmt(deudaSalonTotal), color:G.red },
+        ].map((item,i)=>(
+          <div key={i} style={{ display:"flex", justifyContent:"space-between", padding:"10px 0", borderBottom:`1px solid ${G.border}` }}>
+            <span style={{ fontSize:13, color:G.gray }}>{item.label}</span>
+            <span style={{ fontSize:item.bold?17:14, fontWeight:item.bold?800:500, color:item.color }}>{item.value}</span>
+          </div>
+        ))}
+      </div>
+
+      <div style={{ background:G.bgCard, border:`1px solid ${G.borderGold}`, borderRadius:G.radius, padding:20 }}>
+        <div style={{ fontSize:13, color:G.goldDim, fontWeight:700, letterSpacing:"0.1em", textTransform:"uppercase", marginBottom:16 }}>👤 Finanzas personales</div>
+        {[
+          { label:"Ingresos personales", value:fmt(ingPersonal), color:G.green },
+          { label:"Gastos personales", value:fmt(gasPersonal), color:G.red },
+          { label:"Balance personal", value:fmt(balPersonal), color:balPersonal>=0?G.green:G.red, bold:true },
+          { label:"Deuda personal", value:fmt(deudaPersonalTotal), color:G.red },
+        ].map((item,i)=>(
+          <div key={i} style={{ display:"flex", justifyContent:"space-between", padding:"10px 0", borderBottom:`1px solid ${G.border}` }}>
+            <span style={{ fontSize:13, color:G.gray }}>{item.label}</span>
+            <span style={{ fontSize:item.bold?17:14, fontWeight:item.bold?800:500, color:item.color }}>{item.value}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 // ── APP ───────────────────────────────────────────────────────────────────────
-const VIEWS = [
-  { id:"resumen", label:"Resumen", icon:"⬡" },
-  { id:"atenciones", label:"Atenciones", icon:"✂" },
-  { id:"estilistas", label:"Estilistas", icon:"💇" },
-  { id:"gastos_salon", label:"Gastos salón", icon:"💸" },
-  { id:"deudas_salon", label:"Deudas salón", icon:"🔗" },
-  { id:"nomina", label:"Nómina", icon:"💼" },
-  { id:"personal", label:"Finanzas personales", icon:"👤" },
-];
+const VIEW_TITLES = {
+  home:"Inicio", atenciones:"Atenciones", estilistas:"Estilistas",
+  gastos_salon:"Gastos del salón", deudas_salon:"Deudas del salón",
+  nomina:"Nómina", personal:"Finanzas personales", resumen:"Resumen general"
+};
 
 export default function App() {
-  const [view, setView] = useState("resumen");
+  const [view, setView] = useState("home");
   const [estilistas, setEstilistas] = useState([]);
   const [atenciones, setAtenciones] = useState([]);
   const [gastosSalon, setGastosSalon] = useState([]);
@@ -1074,50 +2052,22 @@ export default function App() {
   const deleteFpDeuda = async (id) => { await db.from("fp_deudas").delete().eq("id",id); setFpDeudas(p=>p.filter(d=>d.id!==id)); };
   const updateFpDeuda = async (upd) => { await db.from("fp_deudas").update(upd).eq("id",upd.id); setFpDeudas(p=>p.map(d=>d.id===upd.id?{...d,...upd}:d)); };
 
-  const viewTitles = { resumen:"Resumen general", atenciones:"Atenciones del salón", estilistas:"Estilistas", gastos_salon:"Gastos del salón", deudas_salon:"Deudas del salón", nomina:"Nómina", personal:"Finanzas personales" };
+  const isHome = view === "home";
 
   return (
-    <div style={{ display:"flex", minHeight:"100vh", background:"#0d1117", fontFamily:"'DM Sans','Segoe UI',sans-serif", color:"#e2e8f0" }}>
-      <div style={{ width:210, background:"#111827", borderRight:"1px solid #1e2a3a", padding:"24px 0", display:"flex", flexDirection:"column", flexShrink:0 }}>
-        <div style={{ padding:"0 20px 24px", borderBottom:"1px solid #1e2a3a" }}>
-          <div style={{ fontSize:16, fontWeight:700, color:"#e2e8f0" }}>✂️ Bertuchi</div>
-          <div style={{ fontSize:11, color:"#10b981", marginTop:4, display:"flex", alignItems:"center", gap:6 }}>
-            <span style={{ width:6, height:6, borderRadius:"50%", background:"#10b981", display:"inline-block" }} />
-            Conectado a Supabase
-          </div>
-        </div>
-        <div style={{ padding:"10px 20px 6px", fontSize:10, color:"#8892a4", textTransform:"uppercase", letterSpacing:"0.08em" }}>Salón</div>
-        {VIEWS.filter(v=>["resumen","atenciones","estilistas","gastos_salon","deudas_salon","nomina"].includes(v.id)).map(v=>(
-          <button key={v.id} onClick={()=>setView(v.id)} style={{ display:"flex", alignItems:"center", gap:10, width:"100%", padding:"9px 20px", background:view===v.id?"#1a2840":"transparent", border:"none", borderLeft:view===v.id?"3px solid #5b8dee":"3px solid transparent", color:view===v.id?"#5b8dee":"#8892a4", cursor:"pointer", fontSize:13, fontWeight:view===v.id?600:400, textAlign:"left" }}>
-            <span style={{ fontSize:15, width:20, textAlign:"center" }}>{v.icon}</span>{v.label}
-          </button>
-        ))}
-        <div style={{ padding:"10px 20px 6px", marginTop:8, fontSize:10, color:"#8892a4", textTransform:"uppercase", letterSpacing:"0.08em", borderTop:"1px solid #1e2a3a" }}>Personal</div>
-        {VIEWS.filter(v=>v.id==="personal").map(v=>(
-          <button key={v.id} onClick={()=>setView(v.id)} style={{ display:"flex", alignItems:"center", gap:10, width:"100%", padding:"9px 20px", background:view===v.id?"#1a2840":"transparent", border:"none", borderLeft:view===v.id?"3px solid #a855f7":"3px solid transparent", color:view===v.id?"#a855f7":"#8892a4", cursor:"pointer", fontSize:13, fontWeight:view===v.id?600:400, textAlign:"left" }}>
-            <span style={{ fontSize:15, width:20, textAlign:"center" }}>{v.icon}</span>{v.label}
-          </button>
-        ))}
-        <div style={{ padding:"16px 20px", borderTop:"1px solid #1e2a3a", marginTop:"auto", fontSize:11, color:"#8892a4" }}>
-          {atenciones.length} atenciones · {estilistas.length} estilistas
-        </div>
-      </div>
+    <div style={{ minHeight:"100vh", background:G.bg, fontFamily:"-apple-system, 'SF Pro Display', 'Segoe UI', sans-serif", color:G.white, maxWidth:480, margin:"0 auto" }}>
+      {error && <div style={{ background:"#2d1515", borderBottom:`1px solid ${G.red}`, padding:"12px 16px", color:G.red, fontSize:13 }}>⚠️ {error}</div>}
 
-      <div style={{ flex:1, overflow:"auto" }}>
-        <div style={{ padding:"24px 28px", borderBottom:"1px solid #1e2a3a", background:"#111827" }}>
-          <h1 style={{ margin:0, fontSize:20, fontWeight:700, color:"#e2e8f0" }}>{viewTitles[view]}</h1>
-        </div>
-        <div style={{ padding:24 }}>
-          {error && <div style={{ background:"#2d1515", border:"1px solid #e8614e", borderRadius:8, padding:16, color:"#e8614e", marginBottom:20, fontSize:14 }}>⚠️ {error}</div>}
-          {view==="resumen" && <ResumenGeneral atenciones={atenciones} gastosSalon={gastosSalon} nomina={nomina} deudasSalon={deudasSalon} fpIngresos={fpIngresos} fpGastos={fpGastos} fpDeudas={fpDeudas} />}
-          {view==="atenciones" && <Atenciones atenciones={atenciones} loading={loadingAten} onAdd={addAtencion} onDelete={deleteAtencion} estilistas={estilistas} />}
-          {view==="estilistas" && <Estilistas estilistas={estilistas} loading={loadingEst} onAdd={addEstilista} onDelete={deleteEstilista} onUpdate={updateEstilista} />}
-          {view==="gastos_salon" && <GastosSalon gastosSalon={gastosSalon} loading={loading} onAdd={addGastoSalon} onDelete={deleteGastoSalon} />}
-          {view==="deudas_salon" && <DeudasSalon deudasSalon={deudasSalon} loading={loading} onAdd={addDeudaSalon} onDelete={deleteDeudaSalon} onUpdate={updateDeudaSalon} />}
-          {view==="nomina" && <Nomina nomina={nomina} loading={loading} onAdd={addNomina} onDelete={deleteNomina} onUpdate={updateNomina} />}
-          {view==="personal" && <FinanzasPersonales fpIngresos={fpIngresos} fpGastos={fpGastos} fpDeudas={fpDeudas} loading={loading} onAddIngreso={addFpIngreso} onAddGasto={addFpGasto} onAddDeuda={addFpDeuda} onDeleteIngreso={deleteFpIngreso} onDeleteGasto={deleteFpGasto} onDeleteDeuda={deleteFpDeuda} onUpdateDeuda={updateFpDeuda} />}
-        </div>
-      </div>
+      {!isHome && <HeaderBar title={VIEW_TITLES[view]} onBack={()=>setView("home")} />}
+
+      {view==="home" && <HomeScreen onNav={setView} atenciones={atenciones} gastosSalon={gastosSalon} nomina={nomina} deudasSalon={deudasSalon} />}
+      {view==="atenciones" && <AtencionesView atenciones={atenciones} loading={loadingAten} onAdd={addAtencion} onDelete={deleteAtencion} estilistas={estilistas} />}
+      {view==="estilistas" && <EstilistasView estilistas={estilistas} loading={loadingEst} onAdd={addEstilista} onDelete={deleteEstilista} onUpdate={updateEstilista} />}
+      {view==="gastos_salon" && <GastosSalonView gastosSalon={gastosSalon} loading={loading} onAdd={addGastoSalon} onDelete={deleteGastoSalon} />}
+      {view==="deudas_salon" && <DeudasSalonView deudasSalon={deudasSalon} loading={loading} onAdd={addDeudaSalon} onDelete={deleteDeudaSalon} onUpdate={updateDeudaSalon} />}
+      {view==="nomina" && <NominaView nomina={nomina} loading={loading} onAdd={addNomina} onDelete={deleteNomina} onUpdate={updateNomina} />}
+      {view==="personal" && <FinanzasPersonalesView fpIngresos={fpIngresos} fpGastos={fpGastos} fpDeudas={fpDeudas} loading={loading} onAddIngreso={addFpIngreso} onAddGasto={addFpGasto} onAddDeuda={addFpDeuda} onDeleteIngreso={deleteFpIngreso} onDeleteGasto={deleteFpGasto} onDeleteDeuda={deleteFpDeuda} onUpdateDeuda={updateFpDeuda} />}
+      {view==="resumen" && <ResumenView atenciones={atenciones} gastosSalon={gastosSalon} nomina={nomina} deudasSalon={deudasSalon} fpIngresos={fpIngresos} fpGastos={fpGastos} fpDeudas={fpDeudas} />}
     </div>
   );
 }
