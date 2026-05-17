@@ -997,7 +997,8 @@ function ResumenGeneral({ atenciones, gastosSalon, nomina, deudasSalon, fpIngres
 }
 
 // ── DESIGN TOKENS ─────────────────────────────────────────────────────────────
-const G = {
+// ── THEMES ────────────────────────────────────────────────────────────────────
+const DARK_THEME = {
   bg:       "#080808",
   bgCard:   "#111111",
   bgInput:  "#1a1a1a",
@@ -1014,6 +1015,26 @@ const G = {
   radius:   14,
   radiusSm: 8,
 };
+
+const LIGHT_THEME = {
+  bg:       "#F5F0E8",
+  bgCard:   "#FFFFFF",
+  bgInput:  "#EDE8DF",
+  border:   "#D4C9B0",
+  borderGold: "#C9A84C66",
+  gold:     "#A67C35",
+  goldLight:"#C9A84C",
+  goldDim:  "#A67C3588",
+  white:    "#1a1a1a",
+  gray:     "#666055",
+  grayMid:  "#888070",
+  red:      "#C0392B",
+  green:    "#27AE60",
+  radius:   14,
+  radiusSm: 8,
+};
+
+let G = DARK_THEME;
 
 const IS = { background:G.bgInput, border:`1px solid ${G.border}`, borderRadius:G.radiusSm, color:G.white, padding:"12px 14px", fontSize:15, width:"100%", boxSizing:"border-box", outline:"none", fontFamily:"inherit" };
 const LS = { fontSize:11, color:G.goldDim, fontWeight:600, letterSpacing:"0.1em", textTransform:"uppercase", display:"block", marginBottom:8 };
@@ -1064,7 +1085,7 @@ function GoldDivider() {
 }
 
 // ── HOME SCREEN ───────────────────────────────────────────────────────────────
-function HomeScreen({ onNav, atenciones, gastosSalon, nomina, deudasSalon }) {
+function HomeScreen({ onNav, atenciones, gastosSalon, nomina, deudasSalon, isDark, onToggleTheme }) {
   const mes = mesStr();
   const hoy = hoyStr();
   const ingresosMes = atenciones.filter(a=>a.fecha.startsWith(mes)).reduce((s,a)=>s+(a.total||0),0);
@@ -1087,7 +1108,10 @@ function HomeScreen({ onNav, atenciones, gastosSalon, nomina, deudasSalon }) {
   return (
     <div style={{ display:"flex", flexDirection:"column", gap:24, paddingBottom:24 }}>
       {/* Header */}
-      <div style={{ textAlign:"center", padding:"32px 20px 8px" }}>
+      <div style={{ textAlign:"center", padding:"32px 20px 8px", position:"relative" }}>
+        <button onClick={onToggleTheme} style={{ position:"absolute", top:32, right:20, background:G.bgCard, border:`1px solid ${G.borderGold}`, borderRadius:20, padding:"6px 14px", cursor:"pointer", fontSize:13, color:G.gold, fontFamily:"inherit", fontWeight:600 }}>
+          {isDark ? "☀️ Claro" : "🌙 Oscuro"}
+        </button>
         <div style={{ fontSize:11, color:G.goldDim, letterSpacing:"0.2em", textTransform:"uppercase", marginBottom:8 }}>Salón de Belleza</div>
         <div style={{ fontSize:32, fontWeight:800, color:G.gold, letterSpacing:"-0.02em", lineHeight:1 }}>BERTUCHI</div>
         <div style={{ fontSize:12, color:G.gray, marginTop:8, letterSpacing:"0.05em" }}>Sistema de gestión exclusivo</div>
@@ -1141,7 +1165,7 @@ function HomeScreen({ onNav, atenciones, gastosSalon, nomina, deudasSalon }) {
 }
 
 // ── HEADER BAR ────────────────────────────────────────────────────────────────
-function HeaderBar({ title, onBack }) {
+function HeaderBar({ title, onBack, isDark, onToggleTheme }) {
   return (
     <div style={{ position:"sticky", top:0, zIndex:100, background:G.bg, borderBottom:`1px solid ${G.borderGold}`, padding:"16px 20px", display:"flex", alignItems:"center", gap:16 }}>
       {onBack && (
@@ -1151,6 +1175,9 @@ function HeaderBar({ title, onBack }) {
         <div style={{ fontSize:11, color:G.goldDim, letterSpacing:"0.15em", textTransform:"uppercase" }}>Bertuchi</div>
         <div style={{ fontSize:18, fontWeight:700, color:G.white, lineHeight:1.2 }}>{title}</div>
       </div>
+      <button onClick={onToggleTheme} style={{ background:"transparent", border:`1px solid ${G.borderGold}`, borderRadius:20, padding:"5px 12px", cursor:"pointer", fontSize:12, color:G.gold, fontFamily:"inherit", fontWeight:600, flexShrink:0 }}>
+        {isDark ? "☀️" : "🌙"}
+      </button>
     </div>
   );
 }
@@ -1987,6 +2014,16 @@ const VIEW_TITLES = {
 
 export default function App() {
   const [view, setView] = useState("home");
+  const [isDark, setIsDark] = useState(() => localStorage.getItem("theme") !== "light");
+
+  const toggleTheme = () => {
+    const newDark = !isDark;
+    setIsDark(newDark);
+    localStorage.setItem("theme", newDark ? "dark" : "light");
+    G = newDark ? DARK_THEME : LIGHT_THEME;
+  };
+
+  G = isDark ? DARK_THEME : LIGHT_THEME;
   const [estilistas, setEstilistas] = useState([]);
   const [atenciones, setAtenciones] = useState([]);
   const [gastosSalon, setGastosSalon] = useState([]);
@@ -2058,9 +2095,9 @@ export default function App() {
     <div style={{ minHeight:"100vh", background:G.bg, fontFamily:"-apple-system, 'SF Pro Display', 'Segoe UI', sans-serif", color:G.white, maxWidth:480, margin:"0 auto" }}>
       {error && <div style={{ background:"#2d1515", borderBottom:`1px solid ${G.red}`, padding:"12px 16px", color:G.red, fontSize:13 }}>⚠️ {error}</div>}
 
-      {!isHome && <HeaderBar title={VIEW_TITLES[view]} onBack={()=>setView("home")} />}
+      {!isHome && <HeaderBar title={VIEW_TITLES[view]} onBack={()=>setView("home")} isDark={isDark} onToggleTheme={toggleTheme} />}
 
-      {view==="home" && <HomeScreen onNav={setView} atenciones={atenciones} gastosSalon={gastosSalon} nomina={nomina} deudasSalon={deudasSalon} />}
+      {view==="home" && <HomeScreen onNav={setView} atenciones={atenciones} gastosSalon={gastosSalon} nomina={nomina} deudasSalon={deudasSalon} isDark={isDark} onToggleTheme={toggleTheme} />}
       {view==="atenciones" && <AtencionesView atenciones={atenciones} loading={loadingAten} onAdd={addAtencion} onDelete={deleteAtencion} estilistas={estilistas} />}
       {view==="estilistas" && <EstilistasView estilistas={estilistas} loading={loadingEst} onAdd={addEstilista} onDelete={deleteEstilista} onUpdate={updateEstilista} />}
       {view==="gastos_salon" && <GastosSalonView gastosSalon={gastosSalon} loading={loading} onAdd={addGastoSalon} onDelete={deleteGastoSalon} />}
