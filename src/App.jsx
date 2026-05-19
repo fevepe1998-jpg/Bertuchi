@@ -1085,7 +1085,7 @@ function GoldDivider() {
 }
 
 // ── HOME SCREEN ───────────────────────────────────────────────────────────────
-function HomeScreen({ onNav, atenciones, gastosSalon, nomina, deudasSalon, isDark, onToggleTheme, modulosVisibles, usuarioNombre, usuarioRol, onLogout }) {
+function HomeScreen({ onNav, atenciones, gastosSalon, nomina, deudasSalon, isDark, onToggleTheme, modulosVisibles, usuarioNombre, usuarioRol, onLogout, onPortalCliente }) {
   const mes = mesStr();
   const hoy = hoyStr();
   const ingresosMes = atenciones.filter(a=>a.fecha.startsWith(mes)).reduce((s,a)=>s+(a.total||0),0);
@@ -1144,6 +1144,21 @@ function HomeScreen({ onNav, atenciones, gastosSalon, nomina, deudasSalon, isDar
           </div>
         </div>
       )}
+
+      <GoldDivider />
+
+      {/* Portal cliente */}
+      <div style={{ padding:"0 16px" }}>
+        <div style={{ fontSize:11, color:G.goldDim, letterSpacing:"0.12em", textTransform:"uppercase", marginBottom:12 }}>Portal cliente</div>
+        <button onClick={onPortalCliente} style={{ display:"flex", alignItems:"center", gap:16, background:"#C9A84C22", border:`1px solid ${G.gold}`, borderRadius:G.radius, padding:"16px 18px", cursor:"pointer", textAlign:"left", width:"100%" }}>
+          <span style={{ fontSize:26, width:36, textAlign:"center", flexShrink:0 }}>📅</span>
+          <div style={{ flex:1 }}>
+            <div style={{ fontSize:15, fontWeight:600, color:G.gold }}>Reservar cita</div>
+            <div style={{ fontSize:12, color:G.gray, marginTop:2 }}>Portal para clientes del salón</div>
+          </div>
+          <span style={{ color:G.gold, fontSize:18 }}>›</span>
+        </button>
+      </div>
 
       <GoldDivider />
 
@@ -2011,7 +2026,7 @@ function ResumenView({ atenciones, gastosSalon, nomina, deudasSalon, fpIngresos,
 }
 
 // ── LOGIN SCREEN ──────────────────────────────────────────────────────────────
-function LoginScreen({ onLogin, isDark, onToggleTheme }) {
+function LoginScreen({ onLogin, isDark, onToggleTheme, onPortalCliente, estilistas }) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
@@ -2053,6 +2068,10 @@ function LoginScreen({ onLogin, isDark, onToggleTheme }) {
         </div>
 
         <div style={{ fontSize:11, color:G.gray, letterSpacing:"0.05em" }}>Acceso restringido · Solo personal autorizado</div>
+        <div style={{ width:"100%", borderTop:`1px solid ${G.border}`, paddingTop:20, display:"flex", flexDirection:"column", alignItems:"center", gap:10 }}>
+          <div style={{ fontSize:12, color:G.gray }}>¿Eres cliente?</div>
+          <GoldBtn variant="ghost" onClick={onPortalCliente} full>✂️ Reservar una cita</GoldBtn>
+        </div>
       </div>
     </div>
   );
@@ -2185,17 +2204,311 @@ function PanelUsuarios({ usuarioActual }) {
   );
 }
 
+
+// ── PORTAL CLIENTE (sin login) ────────────────────────────────────────────────
+const DIAS_SEMANA = ["Lunes","Martes","Miércoles","Jueves","Viernes","Sábado","Domingo"];
+const HORAS = ["08:00","09:00","10:00","11:00","12:00","13:00","14:00","15:00","16:00","17:00"];
+const WHATSAPP_SALON = "573195795755";
+
+function PortalCliente({ estilistas, onVolver }) {
+  const [paso, setPaso] = useState(1);
+  const [estilistaId, setEstilistaId] = useState("");
+  const [servicios, setServicios] = useState([]);
+  const [fecha, setFecha] = useState("");
+  const [hora, setHora] = useState("");
+  const [nombre, setNombre] = useState("");
+  const [telefono, setTelefono] = useState("");
+  const [horasOcupadas, setHorasOcupadas] = useState([]);
+  const [disponibilidad, setDisponibilidad] = useState([]);
+  const [enviado, setEnviado] = useState(false);
+
+  const estilistaSeleccionado = estilistas.find(e => e.id === estilistaId);
+
+  const getDiaSemana = (fechaStr) => {
+    if (!fechaStr) return "";
+    const d = new Date(fechaStr + "T12:00:00");
+    const dias = ["Domingo","Lunes","Martes","Miércoles","Jueves","Viernes","Sábado"];
+    return dias[d.getDay()];
+  };
+
+  const esDomingo = (fechaStr) => getDiaSemana(fechaStr) === "Domingo";
+
+  useEffect(() => {
+    if (estilistaId && fecha) {
+      cargarHorasOcupadas();
+      cargarDisponibilidad();
+    }
+  }, [estilistaId, fecha]);
+
+  const cargarHorasOcupadas = async () => {
+    const { data } = await db.from("citas")
+      .select("hora")
+      .eq("estilista_id", estilistaId)
+      .eq("fecha", fecha)
+      .eq("estado", "pendiente");
+    setHorasOcupadas((data||[]).map(c => c.hora));
+  };
+
+  const cargarDisponibilidad = async () => {
+    const dia = getDiaSemana(fecha);
+    const { data } = await db.from("disponibilidad")
+      .select("*")
+      .eq("estilista_id", estilistaId)
+      .eq("dia", dia);
+    setDisponibilidad(data||[]);
+  };
+
+  const getHorasDisponibles = () => {
+    if (!fecha || !estilistaId) return [];
+    if (esDomingo(fecha)) return [];
+    const dia = getDiaSemana(fecha);
+    const dispDia = disponibilidad.find(d => d.dia === dia);
+    if (dispDia && !dispDia.disponible) return [];
+    const inicio = dispDia?.hora_inicio || "08:00";
+    const fin = dispDia?.hora_fin || "18:00";
+    return HORAS.filter(h => h >= inicio && h < fin && !horasOcupadas.includes(h));
+  };
+
+  const confirmarCita = async () => {
+    if (!nombre || !telefono) return;
+    const id = "c" + Date.now();
+    await db.from("citas").insert([{
+      id, estilista_id: estilistaId,
+      estilista_nombre: estilistaSeleccionado?.nombre || "",
+      cliente_nombre: nombre.trim(),
+      cliente_telefono: telefono.trim(),
+      servicios, fecha, hora, estado: "pendiente"
+    }]);
+
+    const msg = `Hola, acabo de agendar una cita 💇\n\n*Fecha:* ${fecha}\n*Hora:* ${hora}\n*Estilista:* ${estilistaSeleccionado?.nombre}\n*Servicios:* ${servicios.join(", ")}\n*Nombre:* ${nombre}\n*Teléfono:* ${telefono}\n\n¡Hasta pronto! ✂️`;
+    window.open(`https://wa.me/${WHATSAPP_SALON}?text=${encodeURIComponent(msg)}`, "_blank");
+    setEnviado(true);
+  };
+
+  const toggleServicio = (s) => setServicios(p => p.includes(s) ? p.filter(x=>x!==s) : [...p, s]);
+
+  const hoy = new Date().toISOString().split("T")[0];
+  const horasDisp = getHorasDisponibles();
+
+  if (enviado) return (
+    <div style={{ minHeight:"100vh", background:G.bg, display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center", padding:24, fontFamily:"-apple-system,sans-serif", textAlign:"center" }}>
+      <div style={{ fontSize:60, marginBottom:20 }}>✅</div>
+      <div style={{ fontSize:24, fontWeight:800, color:G.gold, marginBottom:12 }}>¡Cita confirmada!</div>
+      <div style={{ fontSize:14, color:G.gray, marginBottom:8 }}>Tu mensaje fue enviado por WhatsApp al salón.</div>
+      <div style={{ background:G.bgCard, border:`1px solid ${G.borderGold}`, borderRadius:G.radius, padding:20, marginBottom:24, width:"100%", maxWidth:360 }}>
+        <div style={{ fontSize:13, color:G.gray, marginBottom:6 }}>📅 {fecha} · ⏰ {hora}</div>
+        <div style={{ fontSize:15, fontWeight:600, color:G.white }}>{estilistaSeleccionado?.nombre}</div>
+        <div style={{ fontSize:13, color:G.gold, marginTop:4 }}>{servicios.join(", ")}</div>
+      </div>
+      <GoldBtn onClick={onVolver} full>Volver al inicio</GoldBtn>
+    </div>
+  );
+
+  return (
+    <div style={{ minHeight:"100vh", background:G.bg, fontFamily:"-apple-system,sans-serif", maxWidth:480, margin:"0 auto" }}>
+      <div style={{ position:"sticky", top:0, zIndex:100, background:G.bg, borderBottom:`1px solid ${G.borderGold}`, padding:"16px 20px", display:"flex", alignItems:"center", gap:16 }}>
+        <button onClick={onVolver} style={{ background:"transparent", border:`1px solid ${G.borderGold}`, borderRadius:G.radiusSm, color:G.gold, padding:"6px 12px", cursor:"pointer", fontSize:18, fontFamily:"inherit" }}>‹</button>
+        <div style={{ flex:1 }}>
+          <div style={{ fontSize:11, color:G.goldDim, letterSpacing:"0.15em", textTransform:"uppercase" }}>Bertuchi</div>
+          <div style={{ fontSize:18, fontWeight:700, color:G.white }}>Reservar cita</div>
+        </div>
+      </div>
+
+      {/* Progress */}
+      <div style={{ display:"flex", padding:"16px 16px 0", gap:6 }}>
+        {[1,2,3,4].map(p => (
+          <div key={p} style={{ flex:1, height:4, borderRadius:99, background: p <= paso ? G.gold : G.border, transition:"background 0.3s" }} />
+        ))}
+      </div>
+
+      <div style={{ padding:16, display:"flex", flexDirection:"column", gap:16, paddingBottom:40 }}>
+
+        {/* Paso 1: Estilista */}
+        {paso >= 1 && (
+          <div style={{ background:G.bgCard, border:`1px solid ${paso===1?G.gold:G.borderGold}`, borderRadius:G.radius, padding:16 }}>
+            <div style={{ fontSize:12, color:G.goldDim, textTransform:"uppercase", letterSpacing:"0.1em", marginBottom:12 }}>1. Elige tu estilista</div>
+            <div style={{ display:"flex", flexDirection:"column", gap:8 }}>
+              {estilistas.filter(e=>e.activo).map(e => (
+                <button key={e.id} onClick={()=>{ setEstilistaId(e.id); if(paso===1) setPaso(2); }} style={{ display:"flex", alignItems:"center", gap:14, padding:"12px 14px", borderRadius:G.radiusSm, border:`1px solid ${estilistaId===e.id?G.gold:G.border}`, background:estilistaId===e.id?"#C9A84C22":G.bgInput, cursor:"pointer", textAlign:"left", fontFamily:"inherit" }}>
+                  <div style={{ width:40, height:40, borderRadius:"50%", background:e.color+"22", border:`2px solid ${e.color}`, display:"flex", alignItems:"center", justifyContent:"center", fontSize:16, fontWeight:700, color:e.color, flexShrink:0 }}>{e.nombre.charAt(0)}</div>
+                  <div>
+                    <div style={{ fontSize:14, fontWeight:600, color:G.white }}>{e.nombre}</div>
+                    {e.especialidad && <div style={{ fontSize:12, color:G.gray }}>{e.especialidad}</div>}
+                  </div>
+                  {estilistaId===e.id && <span style={{ marginLeft:"auto", color:G.gold, fontSize:18 }}>✓</span>}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Paso 2: Servicios */}
+        {paso >= 2 && (
+          <div style={{ background:G.bgCard, border:`1px solid ${paso===2?G.gold:G.borderGold}`, borderRadius:G.radius, padding:16 }}>
+            <div style={{ fontSize:12, color:G.goldDim, textTransform:"uppercase", letterSpacing:"0.1em", marginBottom:12 }}>2. Elige los servicios</div>
+            <div style={{ display:"flex", flexWrap:"wrap", gap:8 }}>
+              {SERVICIOS_DEFAULT.map(s => (
+                <button key={s} onClick={()=>toggleServicio(s)} style={{ fontSize:13, padding:"8px 14px", borderRadius:20, cursor:"pointer", border:servicios.includes(s)?`1px solid ${G.gold}`:`1px solid ${G.border}`, background:servicios.includes(s)?"#C9A84C22":G.bgInput, color:servicios.includes(s)?G.gold:G.gray, fontFamily:"inherit" }}>{s}</button>
+              ))}
+            </div>
+            {servicios.length > 0 && paso === 2 && (
+              <GoldBtn onClick={()=>setPaso(3)} full style={{ marginTop:12 }}>Continuar →</GoldBtn>
+            )}
+          </div>
+        )}
+
+        {/* Paso 3: Fecha y hora */}
+        {paso >= 3 && (
+          <div style={{ background:G.bgCard, border:`1px solid ${paso===3?G.gold:G.borderGold}`, borderRadius:G.radius, padding:16 }}>
+            <div style={{ fontSize:12, color:G.goldDim, textTransform:"uppercase", letterSpacing:"0.1em", marginBottom:12 }}>3. Elige fecha y hora</div>
+            <div style={{ marginBottom:12 }}>
+              <label style={LS}>Fecha</label>
+              <input type="date" style={IS} min={hoy} value={fecha} onChange={e=>{ setFecha(e.target.value); setHora(""); }} />
+            </div>
+            {fecha && esDomingo(fecha) && (
+              <div style={{ background:"#f0a03022", border:"1px solid #f0a03044", borderRadius:G.radiusSm, padding:"12px 14px", fontSize:13, color:"#f0a030", marginBottom:12 }}>
+                📅 Los domingos el salón no tiene agenda disponible. Por favor comunícate directamente con el salón al <strong>319 579 5755</strong> para conciliar una cita.
+              </div>
+            )}
+            {fecha && !esDomingo(fecha) && (
+              <>
+                <label style={LS}>Hora disponible</label>
+                {horasDisp.length === 0 ? (
+                  <div style={{ fontSize:13, color:G.gray, padding:"12px 0" }}>No hay horas disponibles para este día. Elige otra fecha.</div>
+                ) : (
+                  <div style={{ display:"grid", gridTemplateColumns:"repeat(3,1fr)", gap:8 }}>
+                    {horasDisp.map(h => (
+                      <button key={h} onClick={()=>{ setHora(h); setPaso(4); }} style={{ padding:"10px", borderRadius:G.radiusSm, border:`1px solid ${hora===h?G.gold:G.border}`, background:hora===h?"#C9A84C22":G.bgInput, color:hora===h?G.gold:G.white, cursor:"pointer", fontSize:14, fontWeight:hora===h?700:400, fontFamily:"inherit" }}>{h}</button>
+                    ))}
+                  </div>
+                )}
+              </>
+            )}
+          </div>
+        )}
+
+        {/* Paso 4: Datos personales */}
+        {paso >= 4 && (
+          <div style={{ background:G.bgCard, border:`1px solid ${G.gold}`, borderRadius:G.radius, padding:16 }}>
+            <div style={{ fontSize:12, color:G.goldDim, textTransform:"uppercase", letterSpacing:"0.1em", marginBottom:12 }}>4. Tus datos</div>
+            <div style={{ display:"flex", flexDirection:"column", gap:12 }}>
+              <div><label style={LS}>Nombre *</label><input style={IS} placeholder="Tu nombre completo" value={nombre} onChange={e=>setNombre(e.target.value)} /></div>
+              <div><label style={LS}>Teléfono / WhatsApp *</label><input type="tel" style={IS} placeholder="3001234567" value={telefono} onChange={e=>setTelefono(e.target.value)} /></div>
+              <div style={{ background:G.bgInput, borderRadius:G.radiusSm, padding:14, fontSize:13, color:G.gray }}>
+                <div style={{ color:G.white, fontWeight:600, marginBottom:8 }}>Resumen de tu cita</div>
+                <div>✂️ {estilistaSeleccionado?.nombre}</div>
+                <div>📅 {fecha} · ⏰ {hora}</div>
+                <div>💇 {servicios.join(", ")}</div>
+              </div>
+              <GoldBtn onClick={confirmarCita} disabled={!nombre||!telefono} full>Confirmar y enviar por WhatsApp ✉️</GoldBtn>
+              <div style={{ fontSize:11, color:G.gray, textAlign:"center" }}>Al confirmar se abrirá WhatsApp para enviar tu reserva al salón</div>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ── DISPONIBILIDAD ESTILISTA ───────────────────────────────────────────────────
+function DisponibilidadEstilista({ estilistaId }) {
+  const [config, setConfig] = useState({});
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
+
+  useEffect(() => {
+    cargar();
+  }, [estilistaId]);
+
+  const cargar = async () => {
+    const { data } = await db.from("disponibilidad").select("*").eq("estilista_id", estilistaId);
+    const map = {};
+    (data||[]).forEach(d => { map[d.dia] = d; });
+    // Defaults
+    DIAS_SEMANA.forEach(dia => {
+      if (!map[dia]) map[dia] = { dia, disponible: dia !== "Domingo", hora_inicio:"08:00", hora_fin:"18:00" };
+    });
+    setConfig(map);
+    setLoading(false);
+  };
+
+  const guardar = async () => {
+    setSaving(true);
+    for (const dia of DIAS_SEMANA) {
+      const d = config[dia];
+      const { data: existing } = await db.from("disponibilidad").select("id").eq("estilista_id", estilistaId).eq("dia", dia);
+      if (existing && existing.length > 0) {
+        await db.from("disponibilidad").update({ disponible:d.disponible, hora_inicio:d.hora_inicio, hora_fin:d.hora_fin }).eq("estilista_id", estilistaId).eq("dia", dia);
+      } else {
+        await db.from("disponibilidad").insert([{ id:"disp"+Date.now()+dia, estilista_id:estilistaId, dia, disponible:d.disponible, hora_inicio:d.hora_inicio, hora_fin:d.hora_fin }]);
+      }
+    }
+    setSaving(false); setSaved(true);
+    setTimeout(()=>setSaved(false), 2000);
+  };
+
+  const update = (dia, key, value) => setConfig(p => ({ ...p, [dia]: { ...p[dia], [key]: value } }));
+
+  if (loading) return <GoldSpinner />;
+
+  return (
+    <div style={{ display:"flex", flexDirection:"column", gap:12, paddingBottom:40 }}>
+      <div style={{ fontSize:13, color:G.gray, padding:"10px 0" }}>Configura los días y horarios en que estás disponible para atender citas.</div>
+      {DIAS_SEMANA.map(dia => {
+        const d = config[dia] || {};
+        const esDom = dia === "Domingo";
+        return (
+          <div key={dia} style={{ background:G.bgCard, border:`1px solid ${d.disponible?G.borderGold:G.border}`, borderRadius:G.radius, padding:16, opacity:esDom?0.6:1 }}>
+            <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom: d.disponible&&!esDom?12:0 }}>
+              <div style={{ fontSize:15, fontWeight:600, color:d.disponible?G.white:G.gray }}>{dia}</div>
+              <div style={{ display:"flex", alignItems:"center", gap:10 }}>
+                {esDom && <span style={{ fontSize:11, color:"#f0a030" }}>Comunicarse con el salón</span>}
+                {!esDom && (
+                  <button onClick={()=>update(dia,"disponible",!d.disponible)} style={{ fontSize:12, padding:"5px 14px", borderRadius:20, border:"none", cursor:"pointer", background:d.disponible?G.green+"22":G.red+"22", color:d.disponible?G.green:G.red, fontFamily:"inherit", fontWeight:600 }}>
+                    {d.disponible ? "✓ Disponible" : "✗ No disponible"}
+                  </button>
+                )}
+              </div>
+            </div>
+            {d.disponible && !esDom && (
+              <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:10 }}>
+                <div>
+                  <label style={LS}>Desde</label>
+                  <select style={IS} value={d.hora_inicio||"08:00"} onChange={e=>update(dia,"hora_inicio",e.target.value)}>
+                    {HORAS.map(h=><option key={h}>{h}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label style={LS}>Hasta</label>
+                  <select style={IS} value={d.hora_fin||"18:00"} onChange={e=>update(dia,"hora_fin",e.target.value)}>
+                    {[...HORAS,"18:00"].map(h=><option key={h}>{h}</option>)}
+                  </select>
+                </div>
+              </div>
+            )}
+          </div>
+        );
+      })}
+      <GoldBtn onClick={guardar} disabled={saving} full>{saving?"Guardando...":saved?"✓ Guardado":"Guardar disponibilidad"}</GoldBtn>
+    </div>
+  );
+}
+
 // ── APP ───────────────────────────────────────────────────────────────────────
 const VIEW_TITLES = {
   home:"Inicio", atenciones:"Atenciones", estilistas:"Estilistas",
   gastos_salon:"Gastos del salón", deudas_salon:"Deudas del salón",
   nomina:"Nómina", personal:"Finanzas personales", resumen:"Resumen general",
-  usuarios:"Gestión de usuarios"
+  usuarios:"Gestión de usuarios", disponibilidad:"Mi disponibilidad"
 };
 
 export default function App() {
   const [view, setView] = useState("home");
-  const [isDark, setIsDark] = useState(() => localStorage.getItem("theme") !== "light");
+  const [portalCliente, setPortalCliente] = useState(false);
+  const [isDark, setIsDark] = useState(() => {
+    try { return localStorage.getItem("theme") !== "light"; } catch { return true; }
+  });
   const [session, setSession] = useState(null);
   const [usuarioRol, setUsuarioRol] = useState(null);
   const [authLoading, setAuthLoading] = useState(true);
@@ -2203,7 +2516,7 @@ export default function App() {
   const toggleTheme = () => {
     const newDark = !isDark;
     setIsDark(newDark);
-    localStorage.setItem("theme", newDark ? "dark" : "light");
+    try { localStorage.setItem("theme", newDark ? "dark" : "light"); } catch {}
     G = newDark ? DARK_THEME : LIGHT_THEME;
   };
   G = isDark ? DARK_THEME : LIGHT_THEME;
@@ -2223,16 +2536,13 @@ export default function App() {
   }, []);
 
   const cargarRol = async (uid) => {
-    const { data } = await db.from("usuarios").select("rol,activo,nombre").eq("id", uid).single();
+    const { data } = await db.from("usuarios").select("rol,activo,nombre,id").eq("id", uid).single();
     if (data && data.activo) setUsuarioRol(data);
     else setUsuarioRol(null);
     setAuthLoading(false);
   };
 
-  const logout = async () => {
-    await db.auth.signOut();
-    setView("home");
-  };
+  const logout = async () => { await db.auth.signOut(); setView("home"); };
 
   const [estilistas, setEstilistas] = useState([]);
   const [atenciones, setAtenciones] = useState([]);
@@ -2305,7 +2615,6 @@ export default function App() {
   const isEstilista = usuarioRol?.rol === "estilista";
   const isHome = view === "home";
 
-  // Módulos visibles por rol en HomeScreen
   const modulosVisibles = () => {
     const todos = [
       { id:"atenciones",   icon:"✂️",  label:"Atenciones",         sub:"Registrar servicios" },
@@ -2316,45 +2625,37 @@ export default function App() {
       { id:"personal",     icon:"👤",  label:"Finanzas personales", sub:"Separación personal" },
       { id:"resumen",      icon:"📊",  label:"Resumen general",     sub:"Vista completa" },
       { id:"usuarios",     icon:"🔐",  label:"Usuarios",            sub:"Gestión de accesos" },
+      { id:"disponibilidad", icon:"📅", label:"Mi disponibilidad",  sub:"Configura tus horarios" },
     ];
-    if (isAdmin) return todos;
+    if (isAdmin) return todos.filter(m => m.id !== "disponibilidad");
     if (isRecepcionista) return todos.filter(m => ["atenciones","estilistas"].includes(m.id));
-    if (isEstilista) return todos.filter(m => m.id === "atenciones");
+    if (isEstilista) return todos.filter(m => ["atenciones","disponibilidad"].includes(m.id));
     return [];
   };
 
-  if (authLoading) {
-    return (
-      <div style={{ minHeight:"100vh", background:G.bg, display:"flex", alignItems:"center", justifyContent:"center", fontFamily:"-apple-system,sans-serif" }}>
-        <div style={{ color:G.goldDim, fontSize:14, letterSpacing:"0.1em" }}>CARGANDO...</div>
-      </div>
-    );
-  }
+  // Portal cliente — sin login
+  if (portalCliente) return <PortalCliente estilistas={estilistas} onVolver={()=>setPortalCliente(false)} />;
+
+  if (authLoading) return (
+    <div style={{ minHeight:"100vh", background:G.bg, display:"flex", alignItems:"center", justifyContent:"center", fontFamily:"-apple-system,sans-serif" }}>
+      <div style={{ color:G.goldDim, fontSize:14, letterSpacing:"0.1em" }}>CARGANDO...</div>
+    </div>
+  );
 
   if (!session || !usuarioRol) {
-    return <LoginScreen onLogin={()=>{}} isDark={isDark} onToggleTheme={toggleTheme} />;
+    return (
+      <div style={{ minHeight:"100vh", background:G.bg, fontFamily:"-apple-system,sans-serif", maxWidth:480, margin:"0 auto" }}>
+        <LoginScreen onLogin={()=>{}} isDark={isDark} onToggleTheme={toggleTheme} onPortalCliente={()=>setPortalCliente(true)} estilistas={estilistas} />
+      </div>
+    );
   }
 
   return (
     <div style={{ minHeight:"100vh", background:G.bg, fontFamily:"-apple-system,'SF Pro Display','Segoe UI',sans-serif", color:G.white, maxWidth:480, margin:"0 auto" }}>
       {error && <div style={{ background:"#2d1515", borderBottom:`1px solid ${G.red}`, padding:"12px 16px", color:G.red, fontSize:13 }}>⚠️ {error}</div>}
-
       {!isHome && <HeaderBar title={VIEW_TITLES[view]} onBack={()=>setView("home")} isDark={isDark} onToggleTheme={toggleTheme} />}
-
       {view==="home" && (
-        <HomeScreen
-          onNav={setView}
-          atenciones={atenciones}
-          gastosSalon={gastosSalon}
-          nomina={nomina}
-          deudasSalon={deudasSalon}
-          isDark={isDark}
-          onToggleTheme={toggleTheme}
-          modulosVisibles={modulosVisibles()}
-          usuarioNombre={usuarioRol.nombre}
-          usuarioRol={usuarioRol.rol}
-          onLogout={logout}
-        />
+        <HomeScreen onNav={setView} atenciones={atenciones} gastosSalon={gastosSalon} nomina={nomina} deudasSalon={deudasSalon} isDark={isDark} onToggleTheme={toggleTheme} modulosVisibles={modulosVisibles()} usuarioNombre={usuarioRol.nombre} usuarioRol={usuarioRol.rol} onLogout={logout} onPortalCliente={()=>setPortalCliente(true)} />
       )}
       {view==="atenciones" && <AtencionesView atenciones={atenciones} loading={loadingAten} onAdd={addAtencion} onDelete={deleteAtencion} estilistas={estilistas} />}
       {view==="estilistas" && <EstilistasView estilistas={estilistas} loading={loadingEst} onAdd={isAdmin?addEstilista:null} onDelete={isAdmin?deleteEstilista:null} onUpdate={isAdmin?updateEstilista:null} soloLectura={!isAdmin} />}
@@ -2364,6 +2665,7 @@ export default function App() {
       {view==="personal" && isAdmin && <FinanzasPersonalesView fpIngresos={fpIngresos} fpGastos={fpGastos} fpDeudas={fpDeudas} loading={loading} onAddIngreso={addFpIngreso} onAddGasto={addFpGasto} onAddDeuda={addFpDeuda} onDeleteIngreso={deleteFpIngreso} onDeleteGasto={deleteFpGasto} onDeleteDeuda={deleteFpDeuda} onUpdateDeuda={updateFpDeuda} />}
       {view==="resumen" && isAdmin && <ResumenView atenciones={atenciones} gastosSalon={gastosSalon} nomina={nomina} deudasSalon={deudasSalon} fpIngresos={fpIngresos} fpGastos={fpGastos} fpDeudas={fpDeudas} />}
       {view==="usuarios" && isAdmin && <PanelUsuarios usuarioActual={session.user.id} />}
+      {view==="disponibilidad" && isEstilista && <DisponibilidadEstilista estilistaId={session.user.id} />}
     </div>
   );
 }
