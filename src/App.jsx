@@ -1931,7 +1931,7 @@ function LoginScreen({ onLogin, isDark, onToggleTheme, onPortalCliente, estilist
       </button>
 
       <div style={{ width:"100%", maxWidth:360, display:"flex", flexDirection:"column", gap:28, alignItems:"center" }}>
-        <img src="https://raw.githubusercontent.com/fevepe1998-jpg/Bertuchi/main/libelula.jpg" alt="Logo" style={{ width:120, height:120, borderRadius:"50%", objectFit:"cover", border:`2px solid ${G.gold}` }} /> />
+        <img src="https://raw.githubusercontent.com/fevepe1998-jpg/Bertuchi/main/libelula.jpg" alt="Logo" style={{ width:120, height:120, borderRadius:"50%", objectFit:"cover", border:`2px solid ${G.gold}` }} />
 
         <div style={{ textAlign:"center" }}>
           <div style={{ fontSize:11, color:G.goldDim, letterSpacing:"0.2em", textTransform:"uppercase", marginBottom:8 }}>Sistema de gestión</div>
