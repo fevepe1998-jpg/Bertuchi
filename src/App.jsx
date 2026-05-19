@@ -2212,8 +2212,24 @@ const DIAS_SEMANA = ["Lunes","Martes","Miércoles","Jueves","Viernes","Sábado",
 const HORAS = ["08:00","09:00","10:00","11:00","12:00","13:00","14:00","15:00","16:00","17:00"];
 const WHATSAPP_SALON = "573195795755";
 
-function PortalCliente({ estilistas, onVolver, serviciosCatalogo }) {
+function PortalCliente({ onVolver, serviciosCatalogo }) {
+  const [estilistas, setEstilistas] = useState([]);
+  const [loadingEst, setLoadingEst] = useState(true);
   const [paso, setPaso] = useState(1);
+  const [servicios, setServicios] = useState(serviciosCatalogo||[]);
+
+  useEffect(() => {
+    const cargar = async () => {
+      const { data: ests } = await db.from("estilistas").select("*").eq("activo", true).order("created_at");
+      setEstilistas((ests||[]).map(e=>({id:e.id,nombre:e.nombre,especialidad:e.especialidad,color:e.color,activo:e.activo,instagram:e.instagram})));
+      setLoadingEst(false);
+      if (!serviciosCatalogo || serviciosCatalogo.length === 0) {
+        const { data: svcs } = await db.from("servicios").select("*").eq("activo", true).order("created_at");
+        setServicios((svcs||[]).map(s=>s.nombre));
+      }
+    };
+    cargar();
+  }, []);
   const [estilistaId, setEstilistaId] = useState("");
   const [servicios, setServicios] = useState([]);
   const [fecha, setFecha] = useState("");
@@ -2330,7 +2346,9 @@ function PortalCliente({ estilistas, onVolver, serviciosCatalogo }) {
           <div style={{ background:G.bgCard, border:`1px solid ${paso===1?G.gold:G.borderGold}`, borderRadius:G.radius, padding:16 }}>
             <div style={{ fontSize:12, color:G.goldDim, textTransform:"uppercase", letterSpacing:"0.1em", marginBottom:12 }}>1. Elige tu estilista</div>
             <div style={{ display:"flex", flexDirection:"column", gap:8 }}>
-              {estilistas.filter(e=>e.activo).map(e => (
+              {loadingEst && <div style={{ fontSize:13, color:G.gray, padding:"12px 0" }}>Cargando estilistas...</div>}
+              {!loadingEst && estilistas.length===0 && <div style={{ fontSize:13, color:G.gray, padding:"12px 0" }}>No hay estilistas disponibles.</div>}
+              {estilistas.map(e => (
                 <button key={e.id} onClick={()=>{ setEstilistaId(e.id); if(paso===1) setPaso(2); }} style={{ display:"flex", alignItems:"center", gap:14, padding:"12px 14px", borderRadius:G.radiusSm, border:`1px solid ${estilistaId===e.id?G.gold:G.border}`, background:estilistaId===e.id?"#C9A84C22":G.bgInput, cursor:"pointer", textAlign:"left", fontFamily:"inherit" }}>
                   <div style={{ width:40, height:40, borderRadius:"50%", background:e.color+"22", border:`2px solid ${e.color}`, display:"flex", alignItems:"center", justifyContent:"center", fontSize:16, fontWeight:700, color:e.color, flexShrink:0 }}>{e.nombre.charAt(0)}</div>
                   <div style={{ flex:1 }}>
@@ -2350,7 +2368,7 @@ function PortalCliente({ estilistas, onVolver, serviciosCatalogo }) {
           <div style={{ background:G.bgCard, border:`1px solid ${paso===2?G.gold:G.borderGold}`, borderRadius:G.radius, padding:16 }}>
             <div style={{ fontSize:12, color:G.goldDim, textTransform:"uppercase", letterSpacing:"0.1em", marginBottom:12 }}>2. Elige los servicios</div>
             <div style={{ display:"flex", flexWrap:"wrap", gap:8 }}>
-              {(serviciosCatalogo&&serviciosCatalogo.length>0?serviciosCatalogo:SERVICIOS_DEFAULT).map(s => (
+              {(servicios&&servicios.length>0?servicios:SERVICIOS_DEFAULT).map(s => (
                 <button key={s} onClick={()=>toggleServicio(s)} style={{ fontSize:13, padding:"8px 14px", borderRadius:20, cursor:"pointer", border:servicios.includes(s)?`1px solid ${G.gold}`:`1px solid ${G.border}`, background:servicios.includes(s)?"#C9A84C22":G.bgInput, color:servicios.includes(s)?G.gold:G.gray, fontFamily:"inherit" }}>{s}</button>
               ))}
             </div>
@@ -2643,7 +2661,7 @@ export default function App() {
   };
 
   // Portal cliente — sin login
-  if (portalCliente) return <PortalCliente estilistas={estilistas} onVolver={()=>setPortalCliente(false)} serviciosCatalogo={servicios} />;
+  if (portalCliente) return <PortalCliente onVolver={()=>setPortalCliente(false)} serviciosCatalogo={servicios} />;
 
   if (authLoading) return (
     <div style={{ minHeight:"100vh", background:G.bg, display:"flex", alignItems:"center", justifyContent:"center", fontFamily:"-apple-system,sans-serif" }}>
