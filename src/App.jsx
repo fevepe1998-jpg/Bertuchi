@@ -1085,7 +1085,7 @@ function GoldDivider() {
 }
 
 // ── HOME SCREEN ───────────────────────────────────────────────────────────────
-function HomeScreen({ onNav, atenciones, gastosSalon, nomina, deudasSalon, isDark, onToggleTheme }) {
+function HomeScreen({ onNav, atenciones, gastosSalon, nomina, deudasSalon, isDark, onToggleTheme, modulosVisibles, usuarioNombre, usuarioRol, onLogout }) {
   const mes = mesStr();
   const hoy = hoyStr();
   const ingresosMes = atenciones.filter(a=>a.fecha.startsWith(mes)).reduce((s,a)=>s+(a.total||0),0);
@@ -1095,15 +1095,7 @@ function HomeScreen({ onNav, atenciones, gastosSalon, nomina, deudasSalon, isDar
   const atenHoy = atenciones.filter(a=>a.fecha===hoy).length;
   const recaudadoHoy = atenciones.filter(a=>a.fecha===hoy).reduce((s,a)=>s+(a.total||0),0);
 
-  const modules = [
-    { id:"atenciones",   icon:"✂️",  label:"Atenciones",         sub:"Registrar servicios" },
-    { id:"estilistas",   icon:"💇",  label:"Estilistas",          sub:"Equipo y porcentajes" },
-    { id:"gastos_salon", icon:"💸",  label:"Gastos del salón",    sub:"Control de egresos" },
-    { id:"deudas_salon", icon:"🔗",  label:"Deudas del salón",    sub:"Seguimiento de deudas" },
-    { id:"nomina",       icon:"💼",  label:"Nómina",              sub:"Sueldos y pagos" },
-    { id:"personal",     icon:"👤",  label:"Finanzas personales", sub:"Separación personal" },
-    { id:"resumen",      icon:"📊",  label:"Resumen general",     sub:"Vista completa" },
-  ];
+  const ROL_LABELS = { admin:"Administrador", recepcionista:"Recepcionista", estilista:"Estilista" };
 
   return (
     <div style={{ display:"flex", flexDirection:"column", gap:24, paddingBottom:24 }}>
@@ -1117,6 +1109,17 @@ function HomeScreen({ onNav, atenciones, gastosSalon, nomina, deudasSalon, isDar
         <div style={{ fontSize:12, color:G.gray, marginTop:8, letterSpacing:"0.05em" }}>Sistema de gestión exclusivo</div>
       </div>
 
+      {/* Usuario actual */}
+      <div style={{ margin:"0 16px", background:G.bgCard, border:`1px solid ${G.borderGold}`, borderRadius:G.radius, padding:"12px 16px", display:"flex", justifyContent:"space-between", alignItems:"center" }}>
+        <div>
+          <div style={{ fontSize:14, fontWeight:600, color:G.white }}>{usuarioNombre}</div>
+          <div style={{ fontSize:12, color:G.goldDim }}>{ROL_LABELS[usuarioRol] || usuarioRol}</div>
+        </div>
+        <button onClick={onLogout} style={{ background:"transparent", border:`1px solid ${G.red}44`, borderRadius:G.radiusSm, padding:"6px 14px", cursor:"pointer", fontSize:12, color:G.red, fontFamily:"inherit" }}>
+          Cerrar sesión
+        </button>
+      </div>
+
       <GoldDivider />
 
       {/* KPIs del día */}
@@ -1128,17 +1131,19 @@ function HomeScreen({ onNav, atenciones, gastosSalon, nomina, deudasSalon, isDar
         </div>
       </div>
 
-      {/* KPIs del mes */}
-      <div style={{ padding:"0 16px" }}>
-        <div style={{ fontSize:11, color:G.goldDim, letterSpacing:"0.12em", textTransform:"uppercase", marginBottom:12 }}>Este mes</div>
-        <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:10 }}>
-          <GoldCard label="Ingresos" value={fmt(ingresosMes)} icon="📈" positive={true} />
-          <GoldCard label="Gastos" value={fmt(gastosMes + nominaMes)} icon="📉" positive={false} />
+      {/* KPIs del mes — solo admin */}
+      {usuarioRol === "admin" && (
+        <div style={{ padding:"0 16px" }}>
+          <div style={{ fontSize:11, color:G.goldDim, letterSpacing:"0.12em", textTransform:"uppercase", marginBottom:12 }}>Este mes</div>
+          <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:10 }}>
+            <GoldCard label="Ingresos" value={fmt(ingresosMes)} icon="📈" positive={true} />
+            <GoldCard label="Gastos" value={fmt(gastosMes + nominaMes)} icon="📉" positive={false} />
+          </div>
+          <div style={{ marginTop:10 }}>
+            <GoldCard label="Utilidad del salón" value={fmt(utilidad)} icon="⭐" positive={utilidad >= 0} />
+          </div>
         </div>
-        <div style={{ marginTop:10 }}>
-          <GoldCard label="Utilidad del salón" value={fmt(utilidad)} icon="⭐" positive={utilidad >= 0} />
-        </div>
-      </div>
+      )}
 
       <GoldDivider />
 
@@ -1146,9 +1151,9 @@ function HomeScreen({ onNav, atenciones, gastosSalon, nomina, deudasSalon, isDar
       <div style={{ padding:"0 16px" }}>
         <div style={{ fontSize:11, color:G.goldDim, letterSpacing:"0.12em", textTransform:"uppercase", marginBottom:12 }}>Módulos</div>
         <div style={{ display:"flex", flexDirection:"column", gap:8 }}>
-          {modules.map(m=>(
+          {(modulosVisibles||[]).map(m=>(
             <button key={m.id} onClick={()=>onNav(m.id)} style={{ display:"flex", alignItems:"center", gap:16, background:G.bgCard, border:`1px solid ${G.borderGold}`, borderRadius:G.radius, padding:"16px 18px", cursor:"pointer", textAlign:"left", transition:"all 0.2s", width:"100%" }}
-              onMouseEnter={e=>{ e.currentTarget.style.borderColor=G.gold; e.currentTarget.style.background="#1a1a1a"; }}
+              onMouseEnter={e=>{ e.currentTarget.style.borderColor=G.gold; e.currentTarget.style.background=G.bgInput; }}
               onMouseLeave={e=>{ e.currentTarget.style.borderColor=G.borderGold; e.currentTarget.style.background=G.bgCard; }}>
               <span style={{ fontSize:26, width:36, textAlign:"center", flexShrink:0 }}>{m.icon}</span>
               <div style={{ flex:1 }}>
@@ -1183,7 +1188,7 @@ function HeaderBar({ title, onBack, isDark, onToggleTheme }) {
 }
 
 // ── RESTYLED ESTILISTAS ───────────────────────────────────────────────────────
-function EstilistasView({ estilistas, loading, onAdd, onDelete, onUpdate }) {
+function EstilistasView({ estilistas, loading, onAdd, onDelete, onUpdate, soloLectura }) {
   const empty = { nombre:"", telefono:"", especialidad:"", porcentajeBase:50, activo:true };
   const [form, setForm] = useState(empty);
   const [saving, setSaving] = useState(false);
@@ -1209,7 +1214,7 @@ function EstilistasView({ estilistas, loading, onAdd, onDelete, onUpdate }) {
         <GoldCard label="Total" value={estilistas.length} icon="👥" />
       </div>
 
-      <GoldBtn onClick={()=>setShowForm(!showForm)} full>{showForm?"Cerrar formulario":"+ Nuevo estilista"}</GoldBtn>
+      {!soloLectura && <GoldBtn onClick={()=>setShowForm(!showForm)} full>{showForm?"Cerrar formulario":"+ Nuevo estilista"}</GoldBtn>}
 
       {showForm && (
         <div style={{ background:G.bgCard, border:`1px solid ${G.borderGold}`, borderRadius:G.radius, padding:20, display:"flex", flexDirection:"column", gap:14 }}>
@@ -1267,8 +1272,8 @@ function EstilistasView({ estilistas, loading, onAdd, onDelete, onUpdate }) {
                   </div>
                 </div>
                 <div style={{ display:"flex", gap:8 }}>
-                  <GoldBtn variant="ghost" onClick={()=>{setEditId(e.id);setForm({nombre:e.nombre,telefono:e.telefono||"",especialidad:e.especialidad||"",porcentajeBase:e.porcentajeBase,activo:e.activo});setShowForm(true);}}>✏️</GoldBtn>
-                  <GoldBtn variant="danger" onClick={()=>setConfirm(e.id)}>🗑</GoldBtn>
+                  {!soloLectura && <GoldBtn variant="ghost" onClick={()=>{setEditId(e.id);setForm({nombre:e.nombre,telefono:e.telefono||"",especialidad:e.especialidad||"",porcentajeBase:e.porcentajeBase,activo:e.activo});setShowForm(true);}}>✏️</GoldBtn>}
+                  {!soloLectura && <GoldBtn variant="danger" onClick={()=>setConfirm(e.id)}>🗑</GoldBtn>}
                 </div>
               </div>
               <div style={{ display:"flex", justifyContent:"space-between", fontSize:12, color:G.gray, marginBottom:6 }}>
@@ -2005,16 +2010,195 @@ function ResumenView({ atenciones, gastosSalon, nomina, deudasSalon, fpIngresos,
   );
 }
 
+// ── LOGIN SCREEN ──────────────────────────────────────────────────────────────
+function LoginScreen({ onLogin, isDark, onToggleTheme }) {
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+
+  const submit = async () => {
+    if (!email || !password) return;
+    setLoading(true); setError("");
+    const { error: err } = await db.auth.signInWithPassword({ email, password });
+    if (err) { setError("Correo o contraseña incorrectos"); setLoading(false); }
+  };
+
+  return (
+    <div style={{ minHeight:"100vh", background:G.bg, display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center", padding:24, fontFamily:"-apple-system,'SF Pro Display','Segoe UI',sans-serif" }}>
+      <button onClick={onToggleTheme} style={{ position:"fixed", top:20, right:20, background:"transparent", border:`1px solid ${G.borderGold}`, borderRadius:20, padding:"5px 12px", cursor:"pointer", fontSize:12, color:G.gold, fontFamily:"inherit" }}>
+        {isDark ? "☀️" : "🌙"}
+      </button>
+
+      <div style={{ width:"100%", maxWidth:360, display:"flex", flexDirection:"column", gap:28, alignItems:"center" }}>
+        <img src="/logo.jpg" alt="Logo" style={{ width:120, height:120, borderRadius:"50%", objectFit:"cover", border:`2px solid ${G.gold}` }} />
+
+        <div style={{ textAlign:"center" }}>
+          <div style={{ fontSize:11, color:G.goldDim, letterSpacing:"0.2em", textTransform:"uppercase", marginBottom:8 }}>Sistema de gestión</div>
+          <div style={{ fontSize:28, fontWeight:800, color:G.gold, letterSpacing:"-0.02em" }}>BERTUCHI</div>
+          <div style={{ fontSize:12, color:G.gray, marginTop:6 }}>Josué Gómez Peluquería</div>
+        </div>
+
+        <div style={{ width:"100%", display:"flex", flexDirection:"column", gap:14 }}>
+          <div>
+            <label style={LS}>Correo electrónico</label>
+            <input type="email" style={IS} placeholder="correo@bertuchi.com" value={email} onChange={e=>setEmail(e.target.value)} onKeyDown={e=>e.key==="Enter"&&submit()} />
+          </div>
+          <div>
+            <label style={LS}>Contraseña</label>
+            <input type="password" style={IS} placeholder="••••••••" value={password} onChange={e=>setPassword(e.target.value)} onKeyDown={e=>e.key==="Enter"&&submit()} />
+          </div>
+          {error && <div style={{ fontSize:13, color:G.red, textAlign:"center", padding:"10px", background:G.red+"11", borderRadius:G.radiusSm }}>{error}</div>}
+          <GoldBtn onClick={submit} disabled={loading} full>{loading?"Ingresando...":"Ingresar"}</GoldBtn>
+        </div>
+
+        <div style={{ fontSize:11, color:G.gray, letterSpacing:"0.05em" }}>Acceso restringido · Solo personal autorizado</div>
+      </div>
+    </div>
+  );
+}
+
+// ── PANEL USUARIOS (solo admin) ───────────────────────────────────────────────
+function PanelUsuarios({ usuarioActual }) {
+  const [usuarios, setUsuarios] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [showForm, setShowForm] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
+  const [confirm, setConfirm] = useState(null);
+  const [editId, setEditId] = useState(null);
+  const emptyForm = { email:"", password:"", nombre:"", rol:"recepcionista", activo:true };
+  const [form, setForm] = useState(emptyForm);
+  const [errorMsg, setErrorMsg] = useState("");
+
+  useEffect(() => {
+    cargarUsuarios();
+  }, []);
+
+  const cargarUsuarios = async () => {
+    setLoading(true);
+    const { data } = await db.from("usuarios").select("*").order("created_at");
+    setUsuarios(data || []);
+    setLoading(false);
+  };
+
+  const crearUsuario = async () => {
+    if (!form.email || !form.password || !form.nombre) return;
+    setSaving(true); setErrorMsg("");
+    const { data, error } = await db.auth.admin ? 
+      { data: null, error: { message: "Use service role" } } :
+      { data: null, error: { message: "Use service role" } };
+    
+    // Crear via signup temporal
+    const { data: signData, error: signError } = await db.auth.signUp({
+      email: form.email,
+      password: form.password,
+      options: { data: { nombre: form.nombre } }
+    });
+    
+    if (signError) { setErrorMsg(signError.message); setSaving(false); return; }
+    
+    if (signData?.user) {
+      await db.from("usuarios").insert([{
+        id: signData.user.id,
+        nombre: form.nombre,
+        rol: form.rol,
+        activo: form.activo
+      }]);
+    }
+    setForm(emptyForm); setSaving(false); setSaved(true);
+    setTimeout(()=>setSaved(false), 2000);
+    setShowForm(false);
+    cargarUsuarios();
+  };
+
+  const actualizarRol = async (id, nuevoRol, activo) => {
+    await db.from("usuarios").update({ rol: nuevoRol, activo }).eq("id", id);
+    setUsuarios(p => p.map(u => u.id === id ? {...u, rol: nuevoRol, activo} : u));
+  };
+
+  const ROLES = ["admin", "recepcionista", "estilista"];
+  const ROL_LABELS = { admin:"Administrador", recepcionista:"Recepcionista", estilista:"Estilista" };
+  const ROL_COLORS = { admin: G.gold, recepcionista: G.green, estilista: "#a78bfa" };
+
+  return (
+    <div style={{ padding:16, display:"flex", flexDirection:"column", gap:16, paddingBottom:40 }}>
+      <GoldCard label="Usuarios registrados" value={usuarios.length} icon="👥" />
+
+      <GoldBtn onClick={()=>setShowForm(!showForm)} full>{showForm?"Cerrar":"+ Crear nuevo usuario"}</GoldBtn>
+
+      {showForm && (
+        <div style={{ background:G.bgCard, border:`1px solid ${G.borderGold}`, borderRadius:G.radius, padding:20, display:"flex", flexDirection:"column", gap:12 }}>
+          <div style={{ fontSize:13, color:G.gold, fontWeight:700, letterSpacing:"0.05em" }}>NUEVO USUARIO</div>
+          <div><label style={LS}>Nombre *</label><input style={IS} placeholder="Nombre completo" value={form.nombre} onChange={e=>setForm(f=>({...f,nombre:e.target.value}))} /></div>
+          <div><label style={LS}>Correo electrónico *</label><input type="email" style={IS} placeholder="correo@bertuchi.com" value={form.email} onChange={e=>setForm(f=>({...f,email:e.target.value}))} /></div>
+          <div><label style={LS}>Contraseña *</label><input type="password" style={IS} placeholder="Mínimo 6 caracteres" value={form.password} onChange={e=>setForm(f=>({...f,password:e.target.value}))} /></div>
+          <div><label style={LS}>Rol</label>
+            <select style={IS} value={form.rol} onChange={e=>setForm(f=>({...f,rol:e.target.value}))}>
+              {ROLES.map(r=><option key={r} value={r}>{ROL_LABELS[r]}</option>)}
+            </select>
+          </div>
+          <label style={{ display:"flex", alignItems:"center", gap:10, cursor:"pointer", fontSize:14, color:G.white }}>
+            <input type="checkbox" checked={form.activo} onChange={e=>setForm(f=>({...f,activo:e.target.checked}))} style={{ accentColor:G.gold, width:18, height:18 }} />
+            Usuario activo
+          </label>
+          {errorMsg && <div style={{ fontSize:13, color:G.red, padding:"8px 12px", background:G.red+"11", borderRadius:G.radiusSm }}>{errorMsg}</div>}
+          <GoldBtn onClick={crearUsuario} disabled={saving} full>{saving?"Creando...":saved?"✓ Creado":"Crear usuario"}</GoldBtn>
+        </div>
+      )}
+
+      {loading && <GoldSpinner />}
+      {usuarios.map(u => (
+        <div key={u.id} style={{ background:G.bgCard, border:`1px solid ${G.borderGold}`, borderRadius:G.radius, padding:16 }}>
+          <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", marginBottom:12 }}>
+            <div>
+              <div style={{ fontSize:15, fontWeight:600, color: u.activo ? G.white : G.gray }}>{u.nombre}</div>
+              <div style={{ fontSize:12, color:G.gray, marginTop:2 }}>ID: {u.id.slice(0,8)}...</div>
+              {u.id === usuarioActual && <div style={{ fontSize:11, color:G.gold, marginTop:4 }}>← Tú</div>}
+            </div>
+            <span style={{ fontSize:12, padding:"4px 12px", borderRadius:20, background:(ROL_COLORS[u.rol]||G.gold)+"22", color:ROL_COLORS[u.rol]||G.gold, fontWeight:600 }}>
+              {ROL_LABELS[u.rol]}
+            </span>
+          </div>
+
+          <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:10 }}>
+            <div>
+              <label style={{...LS, marginBottom:4}}>Cambiar rol</label>
+              <select style={{...IS, padding:"8px 12px", fontSize:13}} value={u.rol}
+                onChange={e=>actualizarRol(u.id, e.target.value, u.activo)}
+                disabled={u.id === usuarioActual}>
+                {ROLES.map(r=><option key={r} value={r}>{ROL_LABELS[r]}</option>)}
+              </select>
+            </div>
+            <div>
+              <label style={{...LS, marginBottom:4}}>Estado</label>
+              <button onClick={()=>actualizarRol(u.id, u.rol, !u.activo)}
+                disabled={u.id === usuarioActual}
+                style={{ width:"100%", padding:"8px 12px", borderRadius:G.radiusSm, border:"none", cursor: u.id===usuarioActual?"not-allowed":"pointer", background: u.activo ? G.green+"22" : G.red+"22", color: u.activo ? G.green : G.red, fontSize:13, fontWeight:600, fontFamily:"inherit", opacity: u.id===usuarioActual?0.5:1 }}>
+                {u.activo ? "✓ Activo" : "✗ Inactivo"}
+              </button>
+            </div>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 // ── APP ───────────────────────────────────────────────────────────────────────
 const VIEW_TITLES = {
   home:"Inicio", atenciones:"Atenciones", estilistas:"Estilistas",
   gastos_salon:"Gastos del salón", deudas_salon:"Deudas del salón",
-  nomina:"Nómina", personal:"Finanzas personales", resumen:"Resumen general"
+  nomina:"Nómina", personal:"Finanzas personales", resumen:"Resumen general",
+  usuarios:"Gestión de usuarios"
 };
 
 export default function App() {
   const [view, setView] = useState("home");
   const [isDark, setIsDark] = useState(() => localStorage.getItem("theme") !== "light");
+  const [session, setSession] = useState(null);
+  const [usuarioRol, setUsuarioRol] = useState(null);
+  const [authLoading, setAuthLoading] = useState(true);
 
   const toggleTheme = () => {
     const newDark = !isDark;
@@ -2022,8 +2206,34 @@ export default function App() {
     localStorage.setItem("theme", newDark ? "dark" : "light");
     G = newDark ? DARK_THEME : LIGHT_THEME;
   };
-
   G = isDark ? DARK_THEME : LIGHT_THEME;
+
+  useEffect(() => {
+    db.auth.getSession().then(({ data: { session } }) => {
+      setSession(session);
+      if (session) cargarRol(session.user.id);
+      else setAuthLoading(false);
+    });
+    const { data: { subscription } } = db.auth.onAuthStateChange((_event, session) => {
+      setSession(session);
+      if (session) cargarRol(session.user.id);
+      else { setUsuarioRol(null); setAuthLoading(false); }
+    });
+    return () => subscription.unsubscribe();
+  }, []);
+
+  const cargarRol = async (uid) => {
+    const { data } = await db.from("usuarios").select("rol,activo,nombre").eq("id", uid).single();
+    if (data && data.activo) setUsuarioRol(data);
+    else setUsuarioRol(null);
+    setAuthLoading(false);
+  };
+
+  const logout = async () => {
+    await db.auth.signOut();
+    setView("home");
+  };
+
   const [estilistas, setEstilistas] = useState([]);
   const [atenciones, setAtenciones] = useState([]);
   const [gastosSalon, setGastosSalon] = useState([]);
@@ -2038,6 +2248,7 @@ export default function App() {
   const [error, setError] = useState(null);
 
   useEffect(() => {
+    if (!session) return;
     const cargar = async () => {
       try {
         const [r1,r2,r3,r4,r5,r6,r7,r8] = await Promise.all([
@@ -2066,7 +2277,7 @@ export default function App() {
       }
     };
     cargar();
-  }, []);
+  }, [session]);
 
   const addEstilista = async (e) => { const {error} = await db.from("estilistas").insert([{id:e.id,nombre:e.nombre,telefono:e.telefono||null,especialidad:e.especialidad||null,porcentaje_base:e.porcentajeBase,color:e.color,activo:e.activo}]); if(!error) setEstilistas(p=>[...p,e]); };
   const deleteEstilista = async (id) => { await db.from("estilistas").delete().eq("id",id); setEstilistas(p=>p.filter(e=>e.id!==id)); };
@@ -2089,22 +2300,70 @@ export default function App() {
   const deleteFpDeuda = async (id) => { await db.from("fp_deudas").delete().eq("id",id); setFpDeudas(p=>p.filter(d=>d.id!==id)); };
   const updateFpDeuda = async (upd) => { await db.from("fp_deudas").update(upd).eq("id",upd.id); setFpDeudas(p=>p.map(d=>d.id===upd.id?{...d,...upd}:d)); };
 
+  const isAdmin = usuarioRol?.rol === "admin";
+  const isRecepcionista = usuarioRol?.rol === "recepcionista";
+  const isEstilista = usuarioRol?.rol === "estilista";
   const isHome = view === "home";
 
+  // Módulos visibles por rol en HomeScreen
+  const modulosVisibles = () => {
+    const todos = [
+      { id:"atenciones",   icon:"✂️",  label:"Atenciones",         sub:"Registrar servicios" },
+      { id:"estilistas",   icon:"💇",  label:"Estilistas",          sub:"Equipo y porcentajes" },
+      { id:"gastos_salon", icon:"💸",  label:"Gastos del salón",    sub:"Control de egresos" },
+      { id:"deudas_salon", icon:"🔗",  label:"Deudas del salón",    sub:"Seguimiento de deudas" },
+      { id:"nomina",       icon:"💼",  label:"Nómina",              sub:"Sueldos y pagos" },
+      { id:"personal",     icon:"👤",  label:"Finanzas personales", sub:"Separación personal" },
+      { id:"resumen",      icon:"📊",  label:"Resumen general",     sub:"Vista completa" },
+      { id:"usuarios",     icon:"🔐",  label:"Usuarios",            sub:"Gestión de accesos" },
+    ];
+    if (isAdmin) return todos;
+    if (isRecepcionista) return todos.filter(m => ["atenciones","estilistas"].includes(m.id));
+    if (isEstilista) return todos.filter(m => m.id === "atenciones");
+    return [];
+  };
+
+  if (authLoading) {
+    return (
+      <div style={{ minHeight:"100vh", background:G.bg, display:"flex", alignItems:"center", justifyContent:"center", fontFamily:"-apple-system,sans-serif" }}>
+        <div style={{ color:G.goldDim, fontSize:14, letterSpacing:"0.1em" }}>CARGANDO...</div>
+      </div>
+    );
+  }
+
+  if (!session || !usuarioRol) {
+    return <LoginScreen onLogin={()=>{}} isDark={isDark} onToggleTheme={toggleTheme} />;
+  }
+
   return (
-    <div style={{ minHeight:"100vh", background:G.bg, fontFamily:"-apple-system, 'SF Pro Display', 'Segoe UI', sans-serif", color:G.white, maxWidth:480, margin:"0 auto" }}>
+    <div style={{ minHeight:"100vh", background:G.bg, fontFamily:"-apple-system,'SF Pro Display','Segoe UI',sans-serif", color:G.white, maxWidth:480, margin:"0 auto" }}>
       {error && <div style={{ background:"#2d1515", borderBottom:`1px solid ${G.red}`, padding:"12px 16px", color:G.red, fontSize:13 }}>⚠️ {error}</div>}
 
       {!isHome && <HeaderBar title={VIEW_TITLES[view]} onBack={()=>setView("home")} isDark={isDark} onToggleTheme={toggleTheme} />}
 
-      {view==="home" && <HomeScreen onNav={setView} atenciones={atenciones} gastosSalon={gastosSalon} nomina={nomina} deudasSalon={deudasSalon} isDark={isDark} onToggleTheme={toggleTheme} />}
+      {view==="home" && (
+        <HomeScreen
+          onNav={setView}
+          atenciones={atenciones}
+          gastosSalon={gastosSalon}
+          nomina={nomina}
+          deudasSalon={deudasSalon}
+          isDark={isDark}
+          onToggleTheme={toggleTheme}
+          modulosVisibles={modulosVisibles()}
+          usuarioNombre={usuarioRol.nombre}
+          usuarioRol={usuarioRol.rol}
+          onLogout={logout}
+        />
+      )}
       {view==="atenciones" && <AtencionesView atenciones={atenciones} loading={loadingAten} onAdd={addAtencion} onDelete={deleteAtencion} estilistas={estilistas} />}
-      {view==="estilistas" && <EstilistasView estilistas={estilistas} loading={loadingEst} onAdd={addEstilista} onDelete={deleteEstilista} onUpdate={updateEstilista} />}
-      {view==="gastos_salon" && <GastosSalonView gastosSalon={gastosSalon} loading={loading} onAdd={addGastoSalon} onDelete={deleteGastoSalon} />}
-      {view==="deudas_salon" && <DeudasSalonView deudasSalon={deudasSalon} loading={loading} onAdd={addDeudaSalon} onDelete={deleteDeudaSalon} onUpdate={updateDeudaSalon} />}
-      {view==="nomina" && <NominaView nomina={nomina} loading={loading} onAdd={addNomina} onDelete={deleteNomina} onUpdate={updateNomina} />}
-      {view==="personal" && <FinanzasPersonalesView fpIngresos={fpIngresos} fpGastos={fpGastos} fpDeudas={fpDeudas} loading={loading} onAddIngreso={addFpIngreso} onAddGasto={addFpGasto} onAddDeuda={addFpDeuda} onDeleteIngreso={deleteFpIngreso} onDeleteGasto={deleteFpGasto} onDeleteDeuda={deleteFpDeuda} onUpdateDeuda={updateFpDeuda} />}
-      {view==="resumen" && <ResumenView atenciones={atenciones} gastosSalon={gastosSalon} nomina={nomina} deudasSalon={deudasSalon} fpIngresos={fpIngresos} fpGastos={fpGastos} fpDeudas={fpDeudas} />}
+      {view==="estilistas" && <EstilistasView estilistas={estilistas} loading={loadingEst} onAdd={isAdmin?addEstilista:null} onDelete={isAdmin?deleteEstilista:null} onUpdate={isAdmin?updateEstilista:null} soloLectura={!isAdmin} />}
+      {view==="gastos_salon" && isAdmin && <GastosSalonView gastosSalon={gastosSalon} loading={loading} onAdd={addGastoSalon} onDelete={deleteGastoSalon} />}
+      {view==="deudas_salon" && isAdmin && <DeudasSalonView deudasSalon={deudasSalon} loading={loading} onAdd={addDeudaSalon} onDelete={deleteDeudaSalon} onUpdate={updateDeudaSalon} />}
+      {view==="nomina" && isAdmin && <NominaView nomina={nomina} loading={loading} onAdd={addNomina} onDelete={deleteNomina} onUpdate={updateNomina} />}
+      {view==="personal" && isAdmin && <FinanzasPersonalesView fpIngresos={fpIngresos} fpGastos={fpGastos} fpDeudas={fpDeudas} loading={loading} onAddIngreso={addFpIngreso} onAddGasto={addFpGasto} onAddDeuda={addFpDeuda} onDeleteIngreso={deleteFpIngreso} onDeleteGasto={deleteFpGasto} onDeleteDeuda={deleteFpDeuda} onUpdateDeuda={updateFpDeuda} />}
+      {view==="resumen" && isAdmin && <ResumenView atenciones={atenciones} gastosSalon={gastosSalon} nomina={nomina} deudasSalon={deudasSalon} fpIngresos={fpIngresos} fpGastos={fpGastos} fpDeudas={fpDeudas} />}
+      {view==="usuarios" && isAdmin && <PanelUsuarios usuarioActual={session.user.id} />}
     </div>
   );
 }
