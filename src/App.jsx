@@ -2217,10 +2217,20 @@ function PortalCliente({ onVolver, serviciosCatalogo }) {
   const [loadingEst, setLoadingEst] = useState(true);
   const [paso, setPaso] = useState(1);
   const [servicios, setServicios] = useState(serviciosCatalogo||[]);
+  const [estilistaId, setEstilistaId] = useState("");
+  const [fecha, setFecha] = useState("");
+  const [hora, setHora] = useState("");
+  const [nombre, setNombre] = useState("");
+  const [telefono, setTelefono] = useState("");
+  const [horasOcupadas, setHorasOcupadas] = useState([]);
+  const [disponibilidad, setDisponibilidad] = useState([]);
+  const [enviado, setEnviado] = useState(false);
 
   useEffect(() => {
     const cargar = async () => {
-      const { data: ests } = await db.from("estilistas").select("*").eq("activo", true).order("created_at");
+      // FIX: neq("activo", false) incluye registros con activo=true y activo=NULL
+      const { data: ests, error } = await db.from("estilistas").select("*").neq("activo", false).order("created_at");
+      if (error) { console.error("Error cargando estilistas:", error); }
       setEstilistas((ests||[]).map(e=>({id:e.id,nombre:e.nombre,especialidad:e.especialidad,color:e.color,activo:e.activo,instagram:e.instagram})));
       setLoadingEst(false);
       if (!serviciosCatalogo || serviciosCatalogo.length === 0) {
@@ -2230,15 +2240,6 @@ function PortalCliente({ onVolver, serviciosCatalogo }) {
     };
     cargar();
   }, []);
-  const [estilistaId, setEstilistaId] = useState("");
-  const [servicios, setServicios] = useState([]);
-  const [fecha, setFecha] = useState("");
-  const [hora, setHora] = useState("");
-  const [nombre, setNombre] = useState("");
-  const [telefono, setTelefono] = useState("");
-  const [horasOcupadas, setHorasOcupadas] = useState([]);
-  const [disponibilidad, setDisponibilidad] = useState([]);
-  const [enviado, setEnviado] = useState(false);
 
   const estilistaSeleccionado = estilistas.find(e => e.id === estilistaId);
 
