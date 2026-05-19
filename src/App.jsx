@@ -216,7 +216,7 @@ function Atenciones({ atenciones, loading, onAdd, onDelete, estilistas }) {
           <div>
             <label style={LS}>Servicios *</label>
             <div style={{ display:"flex", flexWrap:"wrap", gap:6 }}>
-              {SERVICIOS_DEFAULT.map(s=>(
+              {(serviciosCatalogo&&serviciosCatalogo.length>0?serviciosCatalogo:SERVICIOS_DEFAULT).map(s=>(
                 <button key={s} onClick={()=>toggle(s)} style={{ fontSize:12, padding:"5px 10px", borderRadius:20, cursor:"pointer", border:form.servicios.includes(s)?"1px solid #5b8dee":"1px solid #2a3042", background:form.servicios.includes(s)?"#1a2840":"#111827", color:form.servicios.includes(s)?"#5b8dee":"#8892a4" }}>{s}</button>
               ))}
             </div>
@@ -1193,7 +1193,7 @@ function EstilistasView({ estilistas, loading, onAdd, onDelete, onUpdate, soloLe
 }
 
 // ── RESTYLED ATENCIONES ───────────────────────────────────────────────────────
-function AtencionesView({ atenciones, loading, onAdd, onDelete, estilistas }) {
+function AtencionesView({ atenciones, loading, onAdd, onDelete, estilistas, serviciosCatalogo }) {
   const hoy = hoyStr();
   const empty = { fecha:hoy, cliente:"", estilistaId:"", servicios:[], otroServicio:"", subtotal:"", descuento:"0", metodoPago:"Efectivo", nota:"" };
   const [form, setForm] = useState(empty);
@@ -1962,53 +1962,166 @@ function LoginScreen({ onLogin, isDark, onToggleTheme, onPortalCliente, estilist
   );
 }
 
+// ── CATALOGO SERVICIOS (solo admin) ───────────────────────────────────────────
+function CatalogoServicios() {
+  const [servicios, setServicios] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [nuevo, setNuevo] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [confirm, setConfirm] = useState(null);
+
+  useEffect(() => { cargar(); }, []);
+
+  const cargar = async () => {
+    setLoading(true);
+    const { data } = await db.from("servicios").select("*").order("created_at");
+    setServicios(data||[]);
+    setLoading(false);
+  };
+
+  const agregar = async () => {
+    if (!nuevo.trim() || saving) return;
+    setSaving(true);
+    await db.from("servicios").insert([{ id:"srv"+Date.now(), nombre:nuevo.trim(), activo:true }]);
+    setNuevo(""); setSaving(false);
+    cargar();
+  };
+
+  const eliminar = async (id) => {
+    await db.from("servicios").delete().eq("id", id);
+    setConfirm(null);
+    cargar();
+  };
+
+  const toggleActivo = async (id, activo) => {
+    await db.from("servicios").update({ activo:!activo }).eq("id", id);
+    setServicios(p=>p.map(s=>s.id===id?{...s,activo:!activo}:s));
+  };
+
+  return (
+    <div style={{ padding:16, display:"flex", flexDirection:"column", gap:16, paddingBottom:40 }}>
+      <GoldCard label="Servicios en catálogo" value={servicios.filter(s=>s.activo).length} icon="✂️" />
+
+      <div style={{ background:G.bgCard, border:`1px solid ${G.borderGold}`, borderRadius:G.radius, padding:16, display:"flex", gap:10 }}>
+        <input style={{...IS, flex:1}} placeholder="Nombre del servicio..." value={nuevo} onChange={e=>setNuevo(e.target.value)} onKeyDown={e=>e.key==="Enter"&&agregar()} />
+        <GoldBtn onClick={agregar} disabled={saving || !nuevo.trim()}>{saving?"...":"+ Agregar"}</GoldBtn>
+      </div>
+
+      {loading && <GoldSpinner />}
+      {servicios.map(s => (
+        <div key={s.id} style={{ background:G.bgCard, border:`1px solid ${s.activo?G.borderGold:G.border}`, borderRadius:G.radius, padding:"12px 16px" }}>
+          {confirm===s.id ? (
+            <div style={{ display:"flex", gap:8 }}>
+              <GoldBtn variant="danger" onClick={()=>eliminar(s.id)} full>Eliminar</GoldBtn>
+              <GoldBtn variant="ghost" onClick={()=>setConfirm(null)} full>Cancelar</GoldBtn>
+            </div>
+          ) : (
+            <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center" }}>
+              <div style={{ fontSize:14, fontWeight:600, color:s.activo?G.white:G.gray }}>✂ {s.nombre}</div>
+              <div style={{ display:"flex", gap:8 }}>
+                <button onClick={()=>toggleActivo(s.id, s.activo)} style={{ fontSize:11, padding:"4px 12px", borderRadius:20, border:"none", cursor:"pointer", background:s.activo?G.green+"22":G.red+"22", color:s.activo?G.green:G.red, fontFamily:"inherit" }}>
+                  {s.activo?"Activo":"Inactivo"}
+                </button>
+                <GoldBtn variant="danger" onClick={()=>setConfirm(s.id)}>🗑</GoldBtn>
+              </div>
+            </div>
+          )}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// ── PERFIL ESTILISTA ───────────────────────────────────────────────────────────
+function PerfilEstilista({ userId, estilistas, onUpdate }) {
+  const estilista = estilistas.find(e => e.id === userId);
+  const [form, setForm] = useState({ telefono:"", especialidad:"", instagram:"" });
+  const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
+
+  useEffect(() => {
+    if (estilista) setForm({ telefono:estilista.telefono||"", especialidad:estilista.especialidad||"", instagram:estilista.instagram||"" });
+  }, [estilista]);
+
+  const guardar = async () => {
+    if (saving) return;
+    setSaving(true);
+    await onUpdate({ ...estilista, ...form });
+    setSaving(false); setSaved(true);
+    setTimeout(()=>setSaved(false), 2000);
+  };
+
+  if (!estilista) return (
+    <div style={{ padding:16, textAlign:"center", color:G.gray, fontSize:14 }}>
+      Tu perfil de estilista aún no ha sido configurado por el administrador.
+    </div>
+  );
+
+  return (
+    <div style={{ padding:16, display:"flex", flexDirection:"column", gap:16, paddingBottom:40 }}>
+      <div style={{ background:G.bgCard, border:`1px solid ${G.borderGold}`, borderRadius:G.radius, padding:20, display:"flex", flexDirection:"column", alignItems:"center", gap:8 }}>
+        <div style={{ width:64, height:64, borderRadius:"50%", background:estilista.color+"22", border:`3px solid ${estilista.color}`, display:"flex", alignItems:"center", justifyContent:"center", fontSize:28, fontWeight:800, color:estilista.color }}>{estilista.nombre.charAt(0)}</div>
+        <div style={{ fontSize:20, fontWeight:700, color:G.white }}>{estilista.nombre}</div>
+        <div style={{ fontSize:13, color:G.gold }}>Recibe {estilista.porcentajeBase}% por servicio</div>
+      </div>
+
+      <div style={{ background:G.bgCard, border:`1px solid ${G.borderGold}`, borderRadius:G.radius, padding:20, display:"flex", flexDirection:"column", gap:14 }}>
+        <div style={{ fontSize:13, color:G.gold, fontWeight:700, letterSpacing:"0.05em" }}>MI INFORMACIÓN</div>
+        <div><label style={LS}>Teléfono / WhatsApp</label><input style={IS} placeholder="3001234567" value={form.telefono} onChange={e=>setForm(f=>({...f,telefono:e.target.value}))} /></div>
+        <div><label style={LS}>Especialidad</label><input style={IS} placeholder="Colorista, manicurista..." value={form.especialidad} onChange={e=>setForm(f=>({...f,especialidad:e.target.value}))} /></div>
+        <div>
+          <label style={LS}>Mi perfil de Instagram</label>
+          <input style={IS} placeholder="https://instagram.com/tu_usuario" value={form.instagram} onChange={e=>setForm(f=>({...f,instagram:e.target.value}))} />
+          <div style={{ fontSize:11, color:G.gray, marginTop:6 }}>Los clientes verán este link al elegirte para una cita</div>
+        </div>
+        <GoldBtn onClick={guardar} disabled={saving} full>{saving?"Guardando...":saved?"✓ Guardado":"Guardar perfil"}</GoldBtn>
+      </div>
+    </div>
+  );
+}
+
 // ── PANEL USUARIOS (solo admin) ───────────────────────────────────────────────
-function PanelUsuarios({ usuarioActual }) {
+function PanelUsuarios({ usuarioActual, onEstilistaCreado }) {
   const [usuarios, setUsuarios] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [confirm, setConfirm] = useState(null);
-  const [editId, setEditId] = useState(null);
-  const emptyForm = { email:"", password:"", nombre:"", rol:"recepcionista", activo:true };
+  const emptyForm = { email:"", password:"", nombre:"", rol:"recepcionista", porcentaje:50, activo:true };
   const [form, setForm] = useState(emptyForm);
   const [errorMsg, setErrorMsg] = useState("");
 
-  useEffect(() => {
-    cargarUsuarios();
-  }, []);
+  useEffect(() => { cargarUsuarios(); }, []);
 
   const cargarUsuarios = async () => {
     setLoading(true);
     const { data } = await db.from("usuarios").select("*").order("created_at");
-    setUsuarios(data || []);
+    setUsuarios(data||[]);
     setLoading(false);
   };
 
   const crearUsuario = async () => {
-    if (!form.email || !form.password || !form.nombre) return;
+    if (!form.email||!form.password||!form.nombre) return;
     setSaving(true); setErrorMsg("");
-    const { data, error } = await db.auth.admin ? 
-      { data: null, error: { message: "Use service role" } } :
-      { data: null, error: { message: "Use service role" } };
-    
-    // Crear via signup temporal
     const { data: signData, error: signError } = await db.auth.signUp({
-      email: form.email,
-      password: form.password,
+      email: form.email, password: form.password,
       options: { data: { nombre: form.nombre } }
     });
-    
     if (signError) { setErrorMsg(signError.message); setSaving(false); return; }
-    
     if (signData?.user) {
-      await db.from("usuarios").insert([{
-        id: signData.user.id,
-        nombre: form.nombre,
-        rol: form.rol,
-        activo: form.activo
-      }]);
+      await db.from("usuarios").insert([{ id:signData.user.id, nombre:form.nombre, rol:form.rol, activo:form.activo }]);
+      // Si es estilista, crear perfil automáticamente
+      if (form.rol === "estilista") {
+        await db.from("estilistas").insert([{
+          id: signData.user.id,
+          nombre: form.nombre,
+          porcentaje_base: form.porcentaje,
+          color: COLORES_ESTILISTA[Math.floor(Math.random()*COLORES_ESTILISTA.length)],
+          activo: true
+        }]);
+        if (onEstilistaCreado) onEstilistaCreado();
+      }
     }
     setForm(emptyForm); setSaving(false); setSaved(true);
     setTimeout(()=>setSaved(false), 2000);
@@ -2017,18 +2130,17 @@ function PanelUsuarios({ usuarioActual }) {
   };
 
   const actualizarRol = async (id, nuevoRol, activo) => {
-    await db.from("usuarios").update({ rol: nuevoRol, activo }).eq("id", id);
-    setUsuarios(p => p.map(u => u.id === id ? {...u, rol: nuevoRol, activo} : u));
+    await db.from("usuarios").update({ rol:nuevoRol, activo }).eq("id", id);
+    setUsuarios(p=>p.map(u=>u.id===id?{...u,rol:nuevoRol,activo}:u));
   };
 
-  const ROLES = ["admin", "recepcionista", "estilista"];
+  const ROLES = ["admin","recepcionista","estilista"];
   const ROL_LABELS = { admin:"Administrador", recepcionista:"Recepcionista", estilista:"Estilista" };
-  const ROL_COLORS = { admin: G.gold, recepcionista: G.green, estilista: "#a78bfa" };
+  const ROL_COLORS = { admin:G.gold, recepcionista:G.green, estilista:"#a78bfa" };
 
   return (
     <div style={{ padding:16, display:"flex", flexDirection:"column", gap:16, paddingBottom:40 }}>
       <GoldCard label="Usuarios registrados" value={usuarios.length} icon="👥" />
-
       <GoldBtn onClick={()=>setShowForm(!showForm)} full>{showForm?"Cerrar":"+ Crear nuevo usuario"}</GoldBtn>
 
       {showForm && (
@@ -2042,6 +2154,20 @@ function PanelUsuarios({ usuarioActual }) {
               {ROLES.map(r=><option key={r} value={r}>{ROL_LABELS[r]}</option>)}
             </select>
           </div>
+          {form.rol === "estilista" && (
+            <div>
+              <label style={LS}>Porcentaje que recibe: <span style={{ color:G.gold, fontWeight:700 }}>{form.porcentaje}%</span></label>
+              <input type="range" min="10" max="90" step="5" value={form.porcentaje} onChange={e=>setForm(f=>({...f,porcentaje:parseInt(e.target.value,10)}))} style={{ width:"100%", accentColor:G.gold, cursor:"pointer", marginBottom:8 }} />
+              <div style={{ display:"flex", borderRadius:4, overflow:"hidden", height:6 }}>
+                <div style={{ width:form.porcentaje+"%", background:G.gold }} />
+                <div style={{ flex:1, background:G.green }} />
+              </div>
+              <div style={{ display:"flex", justifyContent:"space-between", fontSize:11, color:G.gray, marginTop:4 }}>
+                <span style={{ color:G.gold }}>Estilista {form.porcentaje}%</span>
+                <span style={{ color:G.green }}>Salón {100-form.porcentaje}%</span>
+              </div>
+            </div>
+          )}
           <label style={{ display:"flex", alignItems:"center", gap:10, cursor:"pointer", fontSize:14, color:G.white }}>
             <input type="checkbox" checked={form.activo} onChange={e=>setForm(f=>({...f,activo:e.target.checked}))} style={{ accentColor:G.gold, width:18, height:18 }} />
             Usuario activo
@@ -2052,34 +2178,26 @@ function PanelUsuarios({ usuarioActual }) {
       )}
 
       {loading && <GoldSpinner />}
-      {usuarios.map(u => (
+      {usuarios.map(u=>(
         <div key={u.id} style={{ background:G.bgCard, border:`1px solid ${G.borderGold}`, borderRadius:G.radius, padding:16 }}>
           <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", marginBottom:12 }}>
             <div>
-              <div style={{ fontSize:15, fontWeight:600, color: u.activo ? G.white : G.gray }}>{u.nombre}</div>
-              <div style={{ fontSize:12, color:G.gray, marginTop:2 }}>ID: {u.id.slice(0,8)}...</div>
-              {u.id === usuarioActual && <div style={{ fontSize:11, color:G.gold, marginTop:4 }}>← Tú</div>}
+              <div style={{ fontSize:15, fontWeight:600, color:u.activo?G.white:G.gray }}>{u.nombre}</div>
+              <div style={{ fontSize:12, color:G.gray, marginTop:2 }}>{u.id===usuarioActual?"← Tú":u.id.slice(0,8)+"..."}</div>
             </div>
-            <span style={{ fontSize:12, padding:"4px 12px", borderRadius:20, background:(ROL_COLORS[u.rol]||G.gold)+"22", color:ROL_COLORS[u.rol]||G.gold, fontWeight:600 }}>
-              {ROL_LABELS[u.rol]}
-            </span>
+            <span style={{ fontSize:12, padding:"4px 12px", borderRadius:20, background:(ROL_COLORS[u.rol]||G.gold)+"22", color:ROL_COLORS[u.rol]||G.gold, fontWeight:600 }}>{ROL_LABELS[u.rol]}</span>
           </div>
-
           <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:10 }}>
             <div>
-              <label style={{...LS, marginBottom:4}}>Cambiar rol</label>
-              <select style={{...IS, padding:"8px 12px", fontSize:13}} value={u.rol}
-                onChange={e=>actualizarRol(u.id, e.target.value, u.activo)}
-                disabled={u.id === usuarioActual}>
+              <label style={{...LS, marginBottom:4}}>Rol</label>
+              <select style={{...IS, padding:"8px 12px", fontSize:13}} value={u.rol} onChange={e=>actualizarRol(u.id, e.target.value, u.activo)} disabled={u.id===usuarioActual}>
                 {ROLES.map(r=><option key={r} value={r}>{ROL_LABELS[r]}</option>)}
               </select>
             </div>
             <div>
               <label style={{...LS, marginBottom:4}}>Estado</label>
-              <button onClick={()=>actualizarRol(u.id, u.rol, !u.activo)}
-                disabled={u.id === usuarioActual}
-                style={{ width:"100%", padding:"8px 12px", borderRadius:G.radiusSm, border:"none", cursor: u.id===usuarioActual?"not-allowed":"pointer", background: u.activo ? G.green+"22" : G.red+"22", color: u.activo ? G.green : G.red, fontSize:13, fontWeight:600, fontFamily:"inherit", opacity: u.id===usuarioActual?0.5:1 }}>
-                {u.activo ? "✓ Activo" : "✗ Inactivo"}
+              <button onClick={()=>actualizarRol(u.id, u.rol, !u.activo)} disabled={u.id===usuarioActual} style={{ width:"100%", padding:"8px 12px", borderRadius:G.radiusSm, border:"none", cursor:u.id===usuarioActual?"not-allowed":"pointer", background:u.activo?G.green+"22":G.red+"22", color:u.activo?G.green:G.red, fontSize:13, fontWeight:600, fontFamily:"inherit", opacity:u.id===usuarioActual?0.5:1 }}>
+                {u.activo?"✓ Activo":"✗ Inactivo"}
               </button>
             </div>
           </div>
@@ -2089,13 +2207,12 @@ function PanelUsuarios({ usuarioActual }) {
   );
 }
 
-
 // ── PORTAL CLIENTE (sin login) ────────────────────────────────────────────────
 const DIAS_SEMANA = ["Lunes","Martes","Miércoles","Jueves","Viernes","Sábado","Domingo"];
 const HORAS = ["08:00","09:00","10:00","11:00","12:00","13:00","14:00","15:00","16:00","17:00"];
 const WHATSAPP_SALON = "573195795755";
 
-function PortalCliente({ estilistas, onVolver }) {
+function PortalCliente({ estilistas, onVolver, serviciosCatalogo }) {
   const [paso, setPaso] = useState(1);
   const [estilistaId, setEstilistaId] = useState("");
   const [servicios, setServicios] = useState([]);
@@ -2216,9 +2333,10 @@ function PortalCliente({ estilistas, onVolver }) {
               {estilistas.filter(e=>e.activo).map(e => (
                 <button key={e.id} onClick={()=>{ setEstilistaId(e.id); if(paso===1) setPaso(2); }} style={{ display:"flex", alignItems:"center", gap:14, padding:"12px 14px", borderRadius:G.radiusSm, border:`1px solid ${estilistaId===e.id?G.gold:G.border}`, background:estilistaId===e.id?"#C9A84C22":G.bgInput, cursor:"pointer", textAlign:"left", fontFamily:"inherit" }}>
                   <div style={{ width:40, height:40, borderRadius:"50%", background:e.color+"22", border:`2px solid ${e.color}`, display:"flex", alignItems:"center", justifyContent:"center", fontSize:16, fontWeight:700, color:e.color, flexShrink:0 }}>{e.nombre.charAt(0)}</div>
-                  <div>
+                  <div style={{ flex:1 }}>
                     <div style={{ fontSize:14, fontWeight:600, color:G.white }}>{e.nombre}</div>
                     {e.especialidad && <div style={{ fontSize:12, color:G.gray }}>{e.especialidad}</div>}
+                    {e.instagram && <a href={e.instagram} target="_blank" rel="noopener noreferrer" onClick={ev=>ev.stopPropagation()} style={{ fontSize:11, color:G.gold, textDecoration:"none", display:"inline-flex", alignItems:"center", gap:4, marginTop:2 }}>📸 Ver mi trabajo →</a>}
                   </div>
                   {estilistaId===e.id && <span style={{ marginLeft:"auto", color:G.gold, fontSize:18 }}>✓</span>}
                 </button>
@@ -2232,7 +2350,7 @@ function PortalCliente({ estilistas, onVolver }) {
           <div style={{ background:G.bgCard, border:`1px solid ${paso===2?G.gold:G.borderGold}`, borderRadius:G.radius, padding:16 }}>
             <div style={{ fontSize:12, color:G.goldDim, textTransform:"uppercase", letterSpacing:"0.1em", marginBottom:12 }}>2. Elige los servicios</div>
             <div style={{ display:"flex", flexWrap:"wrap", gap:8 }}>
-              {SERVICIOS_DEFAULT.map(s => (
+              {(serviciosCatalogo&&serviciosCatalogo.length>0?serviciosCatalogo:SERVICIOS_DEFAULT).map(s => (
                 <button key={s} onClick={()=>toggleServicio(s)} style={{ fontSize:13, padding:"8px 14px", borderRadius:20, cursor:"pointer", border:servicios.includes(s)?`1px solid ${G.gold}`:`1px solid ${G.border}`, background:servicios.includes(s)?"#C9A84C22":G.bgInput, color:servicios.includes(s)?G.gold:G.gray, fontFamily:"inherit" }}>{s}</button>
               ))}
             </div>
@@ -2385,7 +2503,8 @@ const VIEW_TITLES = {
   home:"Inicio", atenciones:"Atenciones", estilistas:"Estilistas",
   gastos_salon:"Gastos del salón", deudas_salon:"Deudas del salón",
   nomina:"Nómina", personal:"Finanzas personales", resumen:"Resumen general",
-  usuarios:"Gestión de usuarios", disponibilidad:"Mi disponibilidad"
+  usuarios:"Gestión de usuarios", disponibilidad:"Mi disponibilidad",
+  perfil:"Mi perfil", servicios:"Catálogo de servicios"
 };
 
 export default function App() {
@@ -2437,6 +2556,7 @@ export default function App() {
   const [fpIngresos, setFpIngresos] = useState([]);
   const [fpGastos, setFpGastos] = useState([]);
   const [fpDeudas, setFpDeudas] = useState([]);
+  const [servicios, setServicios] = useState([]);
   const [loadingEst, setLoadingEst] = useState(true);
   const [loadingAten, setLoadingAten] = useState(true);
   const [loading, setLoading] = useState(true);
@@ -2446,7 +2566,7 @@ export default function App() {
     if (!session) return;
     const cargar = async () => {
       try {
-        const [r1,r2,r3,r4,r5,r6,r7,r8] = await Promise.all([
+        const [r1,r2,r3,r4,r5,r6,r7,r8,r9] = await Promise.all([
           db.from("estilistas").select("*").order("created_at"),
           db.from("atenciones").select("*").order("created_at",{ascending:false}),
           db.from("gastos_salon").select("*").order("fecha",{ascending:false}),
@@ -2455,9 +2575,10 @@ export default function App() {
           db.from("fp_ingresos").select("*").order("fecha",{ascending:false}),
           db.from("fp_gastos").select("*").order("fecha",{ascending:false}),
           db.from("fp_deudas").select("*").order("created_at"),
+          db.from("servicios").select("*").order("created_at"),
         ]);
         if(r1.error) throw r1.error;
-        setEstilistas(r1.data.map(e=>({id:e.id,nombre:e.nombre,telefono:e.telefono,especialidad:e.especialidad,porcentajeBase:e.porcentaje_base,color:e.color,activo:e.activo})));
+        setEstilistas(r1.data.map(e=>({id:e.id,nombre:e.nombre,telefono:e.telefono,especialidad:e.especialidad,porcentajeBase:e.porcentaje_base,color:e.color,activo:e.activo,instagram:e.instagram})));
         setAtenciones(r2.data||[]);
         setGastosSalon(r3.data||[]);
         setDeudasSalon(r4.data||[]);
@@ -2465,6 +2586,7 @@ export default function App() {
         setFpIngresos(r6.data||[]);
         setFpGastos(r7.data||[]);
         setFpDeudas(r8.data||[]);
+        setServicios((r9.data||[]).filter(s=>s.activo).map(s=>s.nombre));
         setLoadingEst(false); setLoadingAten(false); setLoading(false);
       } catch(err) {
         setError("Error: "+err.message);
@@ -2476,7 +2598,7 @@ export default function App() {
 
   const addEstilista = async (e) => { const {error} = await db.from("estilistas").insert([{id:e.id,nombre:e.nombre,telefono:e.telefono||null,especialidad:e.especialidad||null,porcentaje_base:e.porcentajeBase,color:e.color,activo:e.activo}]); if(!error) setEstilistas(p=>[...p,e]); };
   const deleteEstilista = async (id) => { await db.from("estilistas").delete().eq("id",id); setEstilistas(p=>p.filter(e=>e.id!==id)); };
-  const updateEstilista = async (upd) => { await db.from("estilistas").update({nombre:upd.nombre,telefono:upd.telefono||null,especialidad:upd.especialidad||null,porcentaje_base:upd.porcentajeBase,activo:upd.activo}).eq("id",upd.id); setEstilistas(p=>p.map(e=>e.id===upd.id?{...e,...upd}:e)); };
+  const updateEstilista = async (upd) => { await db.from("estilistas").update({nombre:upd.nombre,telefono:upd.telefono||null,especialidad:upd.especialidad||null,porcentaje_base:upd.porcentajeBase,activo:upd.activo,instagram:upd.instagram||null}).eq("id",upd.id); setEstilistas(p=>p.map(e=>e.id===upd.id?{...e,...upd}:e)); };
   const addAtencion = async (a) => { const {error} = await db.from("atenciones").insert([a]); if(!error) setAtenciones(p=>[a,...p]); };
   const deleteAtencion = async (id) => { await db.from("atenciones").delete().eq("id",id); setAtenciones(p=>p.filter(a=>a.id!==id)); };
   const addGastoSalon = async (g) => { const {error} = await db.from("gastos_salon").insert([g]); if(!error) setGastosSalon(p=>[g,...p]); };
@@ -2510,16 +2632,18 @@ export default function App() {
       { id:"personal",     icon:"👤",  label:"Finanzas personales", sub:"Separación personal" },
       { id:"resumen",      icon:"📊",  label:"Resumen general",     sub:"Vista completa" },
       { id:"usuarios",     icon:"🔐",  label:"Usuarios",            sub:"Gestión de accesos" },
+      { id:"servicios",    icon:"✂️",  label:"Catálogo servicios",  sub:"Servicios del salón" },
       { id:"disponibilidad", icon:"📅", label:"Mi disponibilidad",  sub:"Configura tus horarios" },
+      { id:"perfil",       icon:"👤",  label:"Mi perfil",           sub:"Mis datos e Instagram" },
     ];
-    if (isAdmin) return todos.filter(m => m.id !== "disponibilidad");
+    if (isAdmin) return todos.filter(m => !["disponibilidad","perfil"].includes(m.id));
     if (isRecepcionista) return todos.filter(m => ["atenciones","estilistas"].includes(m.id));
-    if (isEstilista) return todos.filter(m => ["atenciones","disponibilidad"].includes(m.id));
+    if (isEstilista) return todos.filter(m => ["atenciones","disponibilidad","perfil"].includes(m.id));
     return [];
   };
 
   // Portal cliente — sin login
-  if (portalCliente) return <PortalCliente estilistas={estilistas} onVolver={()=>setPortalCliente(false)} />;
+  if (portalCliente) return <PortalCliente estilistas={estilistas} onVolver={()=>setPortalCliente(false)} serviciosCatalogo={servicios} />;
 
   if (authLoading) return (
     <div style={{ minHeight:"100vh", background:G.bg, display:"flex", alignItems:"center", justifyContent:"center", fontFamily:"-apple-system,sans-serif" }}>
@@ -2542,15 +2666,17 @@ export default function App() {
       {view==="home" && (
         <HomeScreen onNav={setView} atenciones={atenciones} gastosSalon={gastosSalon} nomina={nomina} deudasSalon={deudasSalon} isDark={isDark} onToggleTheme={toggleTheme} modulosVisibles={modulosVisibles()} usuarioNombre={usuarioRol.nombre} usuarioRol={usuarioRol.rol} onLogout={logout} onPortalCliente={()=>setPortalCliente(true)} />
       )}
-      {view==="atenciones" && <AtencionesView atenciones={atenciones} loading={loadingAten} onAdd={addAtencion} onDelete={deleteAtencion} estilistas={estilistas} />}
+      {view==="atenciones" && <AtencionesView atenciones={atenciones} loading={loadingAten} onAdd={addAtencion} onDelete={deleteAtencion} estilistas={estilistas} serviciosCatalogo={servicios} />}
       {view==="estilistas" && <EstilistasView estilistas={estilistas} loading={loadingEst} onAdd={isAdmin?addEstilista:null} onDelete={isAdmin?deleteEstilista:null} onUpdate={isAdmin?updateEstilista:null} soloLectura={!isAdmin} />}
       {view==="gastos_salon" && isAdmin && <GastosSalonView gastosSalon={gastosSalon} loading={loading} onAdd={addGastoSalon} onDelete={deleteGastoSalon} />}
       {view==="deudas_salon" && isAdmin && <DeudasSalonView deudasSalon={deudasSalon} loading={loading} onAdd={addDeudaSalon} onDelete={deleteDeudaSalon} onUpdate={updateDeudaSalon} />}
       {view==="nomina" && isAdmin && <NominaView nomina={nomina} loading={loading} onAdd={addNomina} onDelete={deleteNomina} onUpdate={updateNomina} />}
       {view==="personal" && isAdmin && <FinanzasPersonalesView fpIngresos={fpIngresos} fpGastos={fpGastos} fpDeudas={fpDeudas} loading={loading} onAddIngreso={addFpIngreso} onAddGasto={addFpGasto} onAddDeuda={addFpDeuda} onDeleteIngreso={deleteFpIngreso} onDeleteGasto={deleteFpGasto} onDeleteDeuda={deleteFpDeuda} onUpdateDeuda={updateFpDeuda} />}
       {view==="resumen" && isAdmin && <ResumenView atenciones={atenciones} gastosSalon={gastosSalon} nomina={nomina} deudasSalon={deudasSalon} fpIngresos={fpIngresos} fpGastos={fpGastos} fpDeudas={fpDeudas} />}
-      {view==="usuarios" && isAdmin && <PanelUsuarios usuarioActual={session.user.id} />}
+      {view==="usuarios" && isAdmin && <PanelUsuarios usuarioActual={session.user.id} onEstilistaCreado={()=>{ db.from("estilistas").select("*").order("created_at").then(({data})=>{ if(data) setEstilistas(data.map(e=>({id:e.id,nombre:e.nombre,telefono:e.telefono,especialidad:e.especialidad,porcentajeBase:e.porcentaje_base,color:e.color,activo:e.activo,instagram:e.instagram}))); }); }} />}
+      {view==="servicios" && isAdmin && <CatalogoServicios />}
       {view==="disponibilidad" && isEstilista && <DisponibilidadEstilista estilistaId={session.user.id} />}
+      {view==="perfil" && isEstilista && <PerfilEstilista userId={session.user.id} estilistas={estilistas} onUpdate={updateEstilista} />}
     </div>
   );
 }
